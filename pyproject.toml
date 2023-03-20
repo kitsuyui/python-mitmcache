@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{ include = "mitm_cache" }]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.9"
 mitmproxy = "^9.0.1"
 
 [tool.poetry.group.dev.dependencies]
