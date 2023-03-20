@@ -1,0 +1,16 @@
+name: happy-commit
+on:
+  - pull_request
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  happy:
+    runs-on: ubuntu-latest
+    name: happy
+    steps:
+      - uses: kitsuyui/happy-commit@v0.7
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
