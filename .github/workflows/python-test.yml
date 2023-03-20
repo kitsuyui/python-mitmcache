@@ -1,0 +1,65 @@
+name: Test
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "${{ matrix.python }}"
+
+      - name: Set up poetry
+        uses: abatilo/actions-poetry@v2
+
+      - name: Cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pypoetry/virtualenvs
+          key: ${{ runner.os }}-build-${{ matrix.python }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ matrix.python }}-${{ hashFiles('**/poetry.lock') }}
+            ${{ runner.os }}-build-${{ matrix.python }}-
+            ${{ runner.os }}-
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Lint
+        run: poetry run poe check
+
+      - name: Check Python version
+        run: |
+          actual_version=$(poetry run python --version)
+          expected_version="Python ${{ matrix.python }}"
+          if [ "$actual_version" == *"$expected_version"* ]; then
+            echo "Expected $expected_version, but got $actual_version"
+            exit 1
+          fi
+
+      - name: Test
+        run: poetry run poe test
+
+      - name: Coverage
+        run: poetry run poe coverage-xml
+
+      - name: Upload coverage report to Codecov
+        if: matrix.python == '3.11'
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+          verbose: true
