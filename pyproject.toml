@@ -43,7 +43,7 @@ kill $PID
 args = [{ name = "cert-path", default = "/tmp/mitm.pem" }]
 
 [tool.poe.tasks]
-coverage-xml = "pytest --cov=mitm_cache mitm_cache --doctest-modules --cov-report=xml"
+coverage-xml = "pytest --cov=mitm_cache tests --doctest-modules --cov-report=xml"
 format-all = [
     { ref = "format" },
     { cmd = "pyupgrade --py311-plus mitm_cache" },
