@@ -50,17 +50,6 @@ The cache is stored in a SQLite3 database (cache.db).
 By default, cache.db is created in the same directory as mitm_cache.py.
 This behavior may change in the future.
 
-## TODO
-
-- [ ] Add more tests
-- [ ] Add CI (GitHub Actions)
-- [ ] Publish docker image
-- [ ] Make it possible to change the cache storage
-- [ ] Support other storage than SQLite3
-- [ ] Make it possible to set the cache expiration time
-- [ ] Make it possible to set the cache size limit
-- [ ] Custome certificate generation
-
 # License
 
 MIT License
