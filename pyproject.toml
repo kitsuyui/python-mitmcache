@@ -1,10 +1,10 @@
 [tool.poetry]
-name = "mitm_cache"
+name = "mitmcache"
 version = "0.1.0"
 description = ""
 authors = ["kitsuyui <kitsuyui@kitsuyui.com>"]
 readme = "README.md"
-packages = [{ include = "mitm_cache" }]
+packages = [{ include = "mitmcache" }]
 
 [tool.poetry.dependencies]
 python = "^3.9"
@@ -43,10 +43,10 @@ kill $PID
 args = [{ name = "cert-path", default = "/tmp/mitm.pem" }]
 
 [tool.poe.tasks]
-coverage-xml = "pytest --cov=mitm_cache tests --doctest-modules --cov-report=xml"
+coverage-xml = "pytest --cov=mitmcache tests --doctest-modules --cov-report=xml"
 format-all = [
     { ref = "format" },
-    { cmd = "pyupgrade --py311-plus mitm_cache" },
+    { cmd = "pyupgrade --py311-plus mitmcache" },
 ]
 
 [tool.poe.tasks.test]
@@ -63,13 +63,13 @@ sequence = [
     { cmd = "mypy ${target}" },
 ]
 args = [
-    { name = "target", default = "mitm_cache tests", multiple = true, positional = true },
+    { name = "target", default = "mitmcache tests", multiple = true, positional = true },
 ]
 ignore_fail = "return_non_zero"
 
 [tool.poe.tasks.format]
 sequence = [{ cmd = "isort ${target}" }, { cmd = "black ${target}" }]
 args = [
-    { name = "target", default = "mitm_cache tests", multiple = true, positional = true },
+    { name = "target", default = "mitmcache tests", multiple = true, positional = true },
 ]
 ignore_fail = "return_non_zero"

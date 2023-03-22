@@ -4,8 +4,8 @@ from mitmproxy import ctx, http
 from mitmproxy.addonmanager import Loader
 from mitmproxy.http import HTTPFlow
 
-from mitm_cache.cache_sqlite3_storage import SQLiteCacheStorage
-from mitm_cache.cache_storage import CacheStorage
+from mitmcache.cache_sqlite3_storage import SQLiteCacheStorage
+from mitmcache.cache_storage import CacheStorage
 
 # Environment variable for specifying the cache file path
 CACHE_FILE_ENV = "MITMPROXY_CACHE_FILE"  # default: cache.db

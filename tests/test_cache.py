@@ -7,7 +7,7 @@ from mitmproxy.addons import script
 from mitmproxy.http import HTTPFlow
 from mitmproxy.io.compat import migrate_flow
 
-from mitm_cache.cache_sqlite3_storage import SQLiteCacheStorage
+from mitmcache.cache_sqlite3_storage import SQLiteCacheStorage
 
 
 # This filter seems not to work
