@@ -7,13 +7,13 @@ from mitmproxy import http
 
 class CacheStorage(Protocol):
     def get_response(self, cache_key: str) -> http.Response | None:
-        pass
+        """Get response from cache with specified cache key."""
 
     def store_response(self, cache_key: str, response: http.HTTPFlow) -> None:
-        pass
+        """Store response in cache with specified cache key."""
 
     def purge_response(self, cache_key: str) -> None:
-        pass
+        """Remove response from cache with specified cache key."""
 
     def close(self) -> None:
-        pass
+        """Close cache storage."""
