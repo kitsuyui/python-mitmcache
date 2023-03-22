@@ -12,5 +12,8 @@ class CacheStorage(Protocol):
     def store_response(self, cache_key: str, response: http.HTTPFlow) -> None:
         pass
 
+    def purge_response(self, cache_key: str) -> None:
+        pass
+
     def close(self) -> None:
         pass

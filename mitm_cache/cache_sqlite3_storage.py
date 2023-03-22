@@ -60,5 +60,10 @@ class SQLiteCacheStorage:
         )
         self.conn.commit()
 
+    def purge_response(self, cache_key: str) -> None:
+        cursor = self.conn.cursor()
+        cursor.execute("DELETE FROM cache WHERE cache_key=?", (cache_key,))
+        self.conn.commit()
+
     def close(self) -> None:
         self.conn.close()
