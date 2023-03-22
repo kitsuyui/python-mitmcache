@@ -55,6 +55,3 @@ class Cache:
     def done(self) -> None:
         # Close cache storage when addon is done
         self.storage.close()
-
-
-addons = [Cache()]

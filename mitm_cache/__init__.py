@@ -1,3 +1,5 @@
-from mitm_cache.cache import Cache
+from mitm_cache.cache import Cache  # noqa: F401
 
-addons = [Cache()]
+__all__ = [
+    "Cache",
+]
