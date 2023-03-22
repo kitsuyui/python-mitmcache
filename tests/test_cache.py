@@ -6,6 +6,7 @@ import pytest
 from mitmproxy.addons import script
 from mitmproxy.http import HTTPFlow
 from mitmproxy.io.compat import migrate_flow
+from mitmproxy.test import taddons, tflow, tutils
 
 from mitmcache.cache_sqlite3_storage import SQLiteCacheStorage
 
@@ -17,9 +18,7 @@ def test_load_addon() -> None:
     script.load_script("inject.py")
 
 
-def test_cache_storage() -> None:
-    """Confirm that the cache storage can be used."""
-    storage = SQLiteCacheStorage(":memory:")
+def example_flow() -> HTTPFlow:
     base_unixtime = 1234567890.123456
     data: dict[bytes | str, Any] = {
         "type": "http",
@@ -113,7 +112,31 @@ def test_cache_storage() -> None:
         "id": "00000000-0000-0000-0000-000000000000",
     }
     flow = HTTPFlow.from_state(migrate_flow(data))
+    return flow
 
+
+def test_simple() -> None:
+    with taddons.context() as tctx:
+        # Confirm that the request unrelated to the cache is processed normally
+        addon = tctx.script("inject.py").addons[0]
+        flow = tflow.tflow(
+            req=tutils.treq(method=b"GET"),
+            resp=tutils.tresp(content=b"Hello, World!"),
+        )
+        addon.request(flow)
+        addon.response(flow)
+
+        # Confirm that the request related to the cache is processed normally
+        flow = example_flow()
+        addon.request(flow)
+        addon.response(flow)
+        addon.done()
+
+
+def test_cache_storage() -> None:
+    """Confirm that the cache storage can be used."""
+    storage = SQLiteCacheStorage(":memory:")
+    flow = example_flow()
     storage.store("test", flow)
     cache = storage.get("test")
     assert cache is not None
