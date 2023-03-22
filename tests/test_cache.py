@@ -114,11 +114,12 @@ def test_cache_storage() -> None:
     }
     flow = HTTPFlow.from_state(migrate_flow(data))
 
-    storage.store_response("test", flow)
-    cache = storage.get_response("test")
+    storage.store("test", flow)
+    cache = storage.get("test")
     assert cache is not None
-    assert cache.status_code == 200
-    assert cache.text == "Hello, World!"
-    storage.purge_response("test")
-    assert storage.get_response("test") is None
+    assert cache.response is not None
+    assert cache.response.status_code == 200
+    assert cache.response.text == "Hello, World!"
+    storage.purge("test")
+    assert storage.get("test") is None
     storage.close()

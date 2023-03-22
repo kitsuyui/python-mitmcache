@@ -34,23 +34,24 @@ class Cache:
 
     def request(self, flow: HTTPFlow) -> None:
         cache_key = flow.request.headers.get(ctx.options.cache_header)
-
-        if cache_key:
-            cached_response = self.storage.get_response(cache_key)
-            if cached_response:
-                ctx.log.info(f"Cache hit: {cache_key}")
-                flow.response = cached_response
-            else:
-                ctx.log.info(f"Cache miss: {cache_key}")
+        if not cache_key:
+            return
+        cache = self.storage.get(cache_key)
+        if cache:
+            ctx.log.info(f"Cache hit: {cache_key}")
+            flow.response = cache.response
+        else:
+            ctx.log.info(f"Cache miss: {cache_key}")
 
     def response(self, flow: http.HTTPFlow) -> None:
-        cache_key = flow.request.headers.get("mitm-cache-key", "").lower()
-        if cache_key and not self.storage.get_response(cache_key):
-            self.storage.store_response(cache_key, flow)
-        elif cache_key:
-            cached_response = self.storage.get_response(cache_key)
-            if cached_response:
-                flow.response = cached_response
+        cache_key = flow.request.headers.get(ctx.options.cache_header)
+        if not cache_key:
+            return
+        cache = self.storage.get(cache_key)
+        if cache:
+            flow.response = cache.response
+        else:
+            self.storage.store(cache_key, flow)
 
     def done(self) -> None:
         # Close cache storage when addon is done
