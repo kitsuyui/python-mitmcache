@@ -1,3 +1,4 @@
+import logging
 import os
 
 from mitmproxy import ctx, http
@@ -11,6 +12,7 @@ from mitmcache.cache_storage import CacheStorage
 CACHE_FILE_ENV = "MITMPROXY_CACHE_FILE"  # default: cache.db
 DEFAULT_CACHE_FILE = "cache.db"
 CACHE_KEY_HEADER = "Mitm-Cache-Key"
+logger = logging.getLogger(__name__)
 
 
 class Cache:
@@ -38,10 +40,10 @@ class Cache:
             return
         cache = self.storage.get(cache_key)
         if cache:
-            ctx.log.info(f"Cache hit: {cache_key}")
+            logger.info(f"Cache hit: {cache_key}")
             flow.response = cache.response
         else:
-            ctx.log.info(f"Cache miss: {cache_key}")
+            logger.info(f"Cache miss: {cache_key}")
 
     def response(self, flow: http.HTTPFlow) -> None:
         cache_key = flow.request.headers.get(ctx.options.cache_header)
