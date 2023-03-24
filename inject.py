@@ -1,1 +1,3 @@
-from mitm_cache import addons
+from mitmcache import Cache
+
+addons = [Cache()]

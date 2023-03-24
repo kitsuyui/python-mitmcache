@@ -25,17 +25,17 @@ class SQLiteCacheStorage:
         )
         self.conn.commit()
 
-    def get_response(self, cache_key: str) -> http.Response | None:
+    def get(self, cache_key: str) -> http.HTTPFlow | None:
         cursor = self.conn.cursor()
         cursor.execute("SELECT * FROM cache WHERE cache_key=?", (cache_key,))
         row = cursor.fetchone()
         if row:
             for flow in mio.FlowReader(io.BytesIO(row["flow"])).stream():
-                return flow.response  # type: ignore
+                return flow  # type: ignore
 
         return None
 
-    def store_response(self, cache_key: str, flow: http.HTTPFlow) -> None:
+    def store(self, cache_key: str, flow: http.HTTPFlow) -> None:
         request = flow.request
         cursor = self.conn.cursor()
         f = io.BytesIO()
@@ -58,6 +58,11 @@ class SQLiteCacheStorage:
                 f.getvalue(),
             ),
         )
+        self.conn.commit()
+
+    def purge(self, cache_key: str) -> None:
+        cursor = self.conn.cursor()
+        cursor.execute("DELETE FROM cache WHERE cache_key=?", (cache_key,))
         self.conn.commit()
 
     def close(self) -> None:

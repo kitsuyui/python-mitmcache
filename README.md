@@ -1,8 +1,8 @@
-# mitm_cache
+# mitmcache
 
-mitm_cache is an addon script for mitmproxy to cache HTTP/HTTPS traffic.
+mitmcache is an addon script for mitmproxy to cache HTTP/HTTPS traffic.
 mitmproxy is a proxy server for HTTP/HTTPS traffic.
-mitm_cache is a simple cache script for mitmproxy.
+mitmcache is a simple cache script for mitmproxy.
 
 This is useful for web service development, testing, debugging and web scraping.
 
@@ -35,7 +35,7 @@ $ curl https://unixtime.jp/
 1234567890 # Note: It changes every second
 ```
 
-If you start mitm_cache and access unixtime.jp, the cached result will be returned.
+If you start mitmcache and access unixtime.jp, the cached result will be returned.
 If you access with the `mitm-cache-key` header, it will be cached with that key.
 
 ```sh
@@ -47,7 +47,7 @@ $ curl --cacert /tmp/mitm.pem -H 'mitm-cache-key: 1234' -x 127.0.0.1:8080 https:
 
 The cache is stored in a SQLite3 database (cache.db).
 
-By default, cache.db is created in the same directory as mitm_cache.py.
+By default, cache.db is created in the same directory as mitmcache.py.
 This behavior may change in the future.
 
 # License
