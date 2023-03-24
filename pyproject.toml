@@ -73,3 +73,10 @@ args = [
     { name = "target", default = "mitmcache tests", multiple = true, positional = true },
 ]
 ignore_fail = "return_non_zero"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning",
+    "ignore:'crypt' is deprecated and slated for removal in Python 3.13",
+]
