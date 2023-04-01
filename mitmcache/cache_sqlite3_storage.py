@@ -60,6 +60,29 @@ class SQLiteCacheStorage:
         )
         self.conn.commit()
 
+    def update(self, cache_key: str, flow: http.HTTPFlow) -> None:
+        request = flow.request
+        cursor = self.conn.cursor()
+        f = io.BytesIO()
+        w = mio.FlowWriter(f)
+        w.add(flow)
+        sql = """\
+        UPDATE cache
+           SET url = ?
+             , method = ?
+             , flow = ?
+         WHERE cache_key = ?"""
+        cursor.execute(
+            sql,
+            (
+                request.method,
+                request.url,
+                f.getvalue(),
+                cache_key,
+            ),
+        )
+        self.conn.commit()
+
     def purge(self, cache_key: str) -> None:
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM cache WHERE cache_key=?", (cache_key,))

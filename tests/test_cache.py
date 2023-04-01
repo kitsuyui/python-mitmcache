@@ -8,6 +8,7 @@ from mitmproxy.http import HTTPFlow
 from mitmproxy.io.compat import migrate_flow
 from mitmproxy.test import taddons, tflow, tutils
 
+from mitmcache.cache import get_cache_key_from_flow
 from mitmcache.cache_sqlite3_storage import SQLiteCacheStorage
 
 
@@ -146,3 +147,102 @@ def test_cache_storage() -> None:
     storage.purge("test")
     assert storage.get("test") is None
     storage.close()
+
+
+@pytest.mark.filterwarnings("ignore:'crypt' is deprecated.*?:")
+def test_cache_hit() -> None:
+    """Confirm that the cache hit is processed normally.
+
+    the request is not sent to the origin server when the cache hit.
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",  # It doesn't listen really
+                headers=[(b"Mitm-Cache-Key", b"1234")],
+            ),
+            resp=tutils.tresp(
+                content=b"Hello, World!",
+                status_code=200,
+            ),
+        )
+        # cache miss but the response is stored
+        addon.request(flow)
+        addon.response(flow)
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",  # It doesn't listen really
+                headers=[(b"Mitm-Cache-Key", b"1234")],
+            ),
+            resp=False,
+        )
+        # cache hit
+        addon.request(flow)
+        assert flow.response is not None
+        assert flow.response.status_code == 200
+        assert flow.response.text == "Hello, World!"
+        addon.response(flow)
+        addon.done()
+
+
+@pytest.mark.filterwarnings("ignore:'crypt' is deprecated.*?:")
+def test_get_cache_key_from_flow() -> None:
+    """Confirm that the cache key is extracted from the flow."""
+    # case1. response is empty
+    flow = tflow.tflow(
+        req=tutils.treq(
+            method=b"GET",
+            path=b"/",
+            host=b"localhost:65535",
+            headers=[(b"Mitm-Cache-Key", b"2345")],
+        ),
+        resp=False,
+    )
+    assert get_cache_key_from_flow(flow) == "2345"
+
+    # case2. request doesn't have the cache key but response has it
+    flow = tflow.tflow(
+        req=tutils.treq(
+            method=b"GET",
+            path=b"/",
+            host=b"localhost:65535",
+        ),
+        resp=tutils.tresp(
+            content=b"Hello, World!",
+            status_code=200,
+            headers=[(b"Mitm-Cache-Key", b"3456")],
+        ),
+    )
+    assert get_cache_key_from_flow(flow) == "3456"
+
+    # case3. request doesn't have the cache key and response is empty
+    flow = tflow.tflow(
+        req=tutils.treq(
+            method=b"GET",
+            path=b"/",
+            host=b"localhost:65535",
+        ),
+        resp=False,
+    )
+    assert get_cache_key_from_flow(flow) is None
+
+    # case4. request and response don't have the cache key
+    flow = tflow.tflow(
+        req=tutils.treq(
+            method=b"GET",
+            path=b"/",
+            host=b"localhost:65535",
+        ),
+        resp=tutils.tresp(
+            content=b"Hello, World!",
+            status_code=200,
+        ),
+    )
+    assert get_cache_key_from_flow(flow) is None

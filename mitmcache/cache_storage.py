@@ -15,5 +15,8 @@ class CacheStorage(Protocol):
     def purge(self, cache_key: str) -> None:
         """Remove flow from cache with specified cache key."""
 
+    def update(self, cache_key: str, flow: http.HTTPFlow) -> None:
+        """Update flow in cache with specified cache key."""
+
     def close(self) -> None:
         """Close cache storage."""
