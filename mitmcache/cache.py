@@ -31,10 +31,10 @@ class Cache:
     def load(self, loader: Loader) -> None:
         # Add option for specifying cache header
         loader.add_option(
-            "cache_header",
-            str,
-            CACHE_KEY_HEADER,
-            "Header used to determine the cache key.",
+            name="cache_header",
+            typespec=str,
+            default=CACHE_KEY_HEADER,
+            help="Header used to determine the cache key.",
         )
 
     def request(self, flow: HTTPFlow) -> None:
