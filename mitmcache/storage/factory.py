@@ -19,10 +19,6 @@ from .sqlite3 import SQLiteStorage
 
 
 class StorageFactory:
-    def load_and_create(self, loader: Loader) -> CacheStorage:
-        self.load(loader)
-        return self.create()
-
     def create(self) -> CacheStorage:
         return SQLiteStorage(ctx.options.cache_file)
 
@@ -30,6 +26,6 @@ class StorageFactory:
         loader.add_option(
             name="cache_file",
             typespec=str,
-            default="cache.db",
+            default=":memory:",
             help="Cache file path for SQLite3 storage.",
         )

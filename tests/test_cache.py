@@ -18,6 +18,7 @@ def test_simple() -> None:
     with taddons.context() as tctx:
         # Confirm that the request unrelated to the cache is processed normally
         addon = tctx.script("inject.py").addons[0]
+
         flow = tflow.tflow(
             req=tutils.treq(method=b"GET"),
             resp=tutils.tresp(content=b"Hello, World!"),

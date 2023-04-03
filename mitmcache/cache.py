@@ -14,11 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 class Cache:
-    storage_factory = StorageFactory()
+    storage_factory: StorageFactory
     storage: CacheStorage
-
-    def __init__(self) -> None:
-        self.storage_factory = StorageFactory()
 
     def load(self, loader: Loader) -> None:
         loader.add_option(
@@ -34,7 +31,11 @@ class Cache:
             help="Header used to determine\
  whether the request is from the origin",
         )
-        self.storage = self.storage_factory.load_and_create(loader)
+        self.storage_factory = StorageFactory()
+        self.storage_factory.load(loader)
+
+    def configure(self, updated: set[str]) -> None:
+        self.storage = self.storage_factory.create()
 
     @property
     def cache_key(self) -> str:
