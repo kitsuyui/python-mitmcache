@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from uuid import uuid4
 
 from mitmproxy import ctx, http
@@ -9,24 +8,20 @@ from mitmproxy.addonmanager import Loader
 from mitmproxy.http import HTTPFlow
 
 from mitmcache.storage.cache_storage import CacheStorage
-from mitmcache.storage.sqlite3 import SQLiteStorage
+from mitmcache.storage.factory import StorageFactory
 
 # Environment variable for specifying the cache file path
-CACHE_FILE_ENV = "MITMPROXY_CACHE_FILE"  # default: cache.db
-DEFAULT_CACHE_FILE = "cache.db"
 CACHE_KEY_HEADER = "Mitm-Cache-Key"
 FROM_ORIGIN = "Mitm-Cache-From-Origin"
 logger = logging.getLogger(__name__)
 
 
 class Cache:
+    storage_factory = StorageFactory()
     storage: CacheStorage
 
     def __init__(self) -> None:
-        # Initialize cache storage
-        cache_file = os.environ.get(CACHE_FILE_ENV, DEFAULT_CACHE_FILE)
-        # TODO: Add support for other cache storages
-        self.storage = SQLiteStorage(cache_file)
+        self.storage_factory = StorageFactory()
 
     def load(self, loader: Loader) -> None:
         # Add option for specifying cache header
@@ -36,6 +31,7 @@ class Cache:
             default=CACHE_KEY_HEADER,
             help="Header used to determine the cache key.",
         )
+        self.storage = self.storage_factory.load_and_create(loader)
 
     def request(self, flow: HTTPFlow) -> None:
         """request
