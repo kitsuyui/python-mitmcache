@@ -30,7 +30,10 @@ multi_line_output = 3
 line_length = 79
 
 [tool.poe.tasks.proxy]
-cmd = "mitmdump -s inject.py"
+cmd = "mitmdump -s inject.py --set cache_file=${cache_file}"
+args = [
+    { name = "cache-file", default = "cache.db" },
+]
 
 [tool.poe.tasks.download_cert]
 shell = """
@@ -73,3 +76,9 @@ args = [
     { name = "target", default = "mitmcache tests", multiple = true, positional = true },
 ]
 ignore_fail = "return_non_zero"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:'crypt' is deprecated and slated for removal in Python 3.13",
+    "ignore::ResourceWarning",
+]
