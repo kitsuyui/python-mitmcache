@@ -4,8 +4,6 @@ import pytest
 from mitmproxy.addons import script
 from mitmproxy.test import taddons, tflow, tutils
 
-from mitmcache.cache import get_cache_key_from_flow
-
 from .example_flow import example_flow
 
 
@@ -80,54 +78,59 @@ def test_cache_hit() -> None:
 @pytest.mark.filterwarnings("ignore:'crypt' is deprecated.*?:")
 def test_get_cache_key_from_flow() -> None:
     """Confirm that the cache key is extracted from the flow."""
-    # case1. response is empty
-    flow = tflow.tflow(
-        req=tutils.treq(
-            method=b"GET",
-            path=b"/",
-            host=b"localhost:65535",
-            headers=[(b"Mitm-Cache-Key", b"2345")],
-        ),
-        resp=False,
-    )
-    assert get_cache_key_from_flow(flow) == "2345"
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
 
-    # case2. request doesn't have the cache key but response has it
-    flow = tflow.tflow(
-        req=tutils.treq(
-            method=b"GET",
-            path=b"/",
-            host=b"localhost:65535",
-        ),
-        resp=tutils.tresp(
-            content=b"Hello, World!",
-            status_code=200,
-            headers=[(b"Mitm-Cache-Key", b"3456")],
-        ),
-    )
-    assert get_cache_key_from_flow(flow) == "3456"
+        # case1. response is empty
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"2345")],
+            ),
+            resp=False,
+        )
+        assert addon.get_cache_key_from_flow(flow) == "2345"
 
-    # case3. request doesn't have the cache key and response is empty
-    flow = tflow.tflow(
-        req=tutils.treq(
-            method=b"GET",
-            path=b"/",
-            host=b"localhost:65535",
-        ),
-        resp=False,
-    )
-    assert get_cache_key_from_flow(flow) is None
+        # case2. request doesn't have the cache key but response has it
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+            ),
+            resp=tutils.tresp(
+                content=b"Hello, World!",
+                status_code=200,
+                headers=[(b"Mitm-Cache-Key", b"3456")],
+            ),
+        )
+        assert addon.get_cache_key_from_flow(flow) == "3456"
 
-    # case4. request and response don't have the cache key
-    flow = tflow.tflow(
-        req=tutils.treq(
-            method=b"GET",
-            path=b"/",
-            host=b"localhost:65535",
-        ),
-        resp=tutils.tresp(
-            content=b"Hello, World!",
-            status_code=200,
-        ),
-    )
-    assert get_cache_key_from_flow(flow) is None
+        # case3. request doesn't have the cache key and response is empty
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+            ),
+            resp=False,
+        )
+        assert addon.get_cache_key_from_flow(flow) is None
+
+        # case4. request and response don't have the cache key
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+            ),
+            resp=tutils.tresp(
+                content=b"Hello, World!",
+                status_code=200,
+            ),
+        )
+        assert addon.get_cache_key_from_flow(flow) is None
+
+        addon.done()

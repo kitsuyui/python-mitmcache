@@ -10,9 +10,6 @@ from mitmproxy.http import HTTPFlow
 from mitmcache.storage.cache_storage import CacheStorage
 from mitmcache.storage.factory import StorageFactory
 
-# Environment variable for specifying the cache file path
-CACHE_KEY_HEADER = "Mitm-Cache-Key"
-FROM_ORIGIN = "Mitm-Cache-From-Origin"
 logger = logging.getLogger(__name__)
 
 
@@ -24,14 +21,28 @@ class Cache:
         self.storage_factory = StorageFactory()
 
     def load(self, loader: Loader) -> None:
-        # Add option for specifying cache header
         loader.add_option(
-            name="cache_header",
+            name="cache_key",
             typespec=str,
-            default=CACHE_KEY_HEADER,
+            default="Mitm-Cache-Key",
             help="Header used to determine the cache key.",
         )
+        loader.add_option(
+            name="cache_from_origin",
+            typespec=str,
+            default="Mitm-Cache-From-Origin",
+            help="Header used to determine\
+ whether the request is from the origin",
+        )
         self.storage = self.storage_factory.load_and_create(loader)
+
+    @property
+    def cache_key(self) -> str:
+        return str(ctx.options.cache_key)
+
+    @property
+    def cache_from_origin(self) -> str:
+        return str(ctx.options.cache_from_origin)
 
     def request(self, flow: HTTPFlow) -> None:
         """request
@@ -44,7 +55,7 @@ class Cache:
           generate a cache key and set it to the response headers.
         """
         # Get cache key or create it from request headers
-        cache_key = get_cache_key_from_flow(flow)
+        cache_key = self.get_cache_key_from_flow(flow)
         search_cache = True if cache_key is not None else False
 
         # Get response from cache
@@ -54,17 +65,17 @@ class Cache:
                 assert cache.response is not None
                 logger.info(f"Cache hit: {cache_key}")
                 flow.response = cache.response
-                flow.response.headers[ctx.options.cache_header] = cache_key
-                flow.metadata[ctx.options.cache_header] = cache_key
-                flow.metadata[FROM_ORIGIN] = False
+                flow.response.headers[self.cache_key] = cache_key
+                flow.metadata[self.cache_key] = cache_key
+                flow.metadata[self.cache_from_origin] = False
         else:
             cache_key = generate_cache_key_by_uuid()
             # Remove header before sending to origin server
-            flow.request.headers.pop(ctx.options.cache_header, None)
+            flow.request.headers.pop(self.cache_key, None)
 
         # Set cache key to flow
-        flow.metadata[ctx.options.cache_header] = cache_key
-        flow.metadata[FROM_ORIGIN] = True
+        flow.metadata[self.cache_key] = cache_key
+        flow.metadata[self.cache_from_origin] = True
 
     def response(self, flow: http.HTTPFlow) -> None:
         """response
@@ -75,9 +86,8 @@ class Cache:
         """
 
         # Check if the response has a cache key
-        cache_key = get_cache_key_from_flow(flow)
-
-        if flow.metadata.get(FROM_ORIGIN, False) and cache_key:
+        cache_key = self.get_cache_key_from_flow(flow)
+        if flow.metadata.get(self.cache_from_origin, False) and cache_key:
             cache = self.storage.get(cache_key)
             if cache is not None:
                 self.storage.update(cache_key, flow)
@@ -86,26 +96,25 @@ class Cache:
                 self.storage.store(cache_key, flow)
                 logger.info(f"Cache stored: {cache_key}")
 
+    def get_cache_key_from_flow(self, flow: HTTPFlow) -> str | None:
+        # 1. Try from flow metadata
+        cache_key = flow.metadata.get(self.cache_key)
+        if cache_key is not None:
+            return str(cache_key)
+        # 2. Try from request headers
+        cache_key = flow.request.headers.get(self.cache_key)
+        if cache_key is not None:
+            return str(cache_key)
+        # 3. Try from response headers
+        if not flow.response:
+            return None
+        cache_key = flow.response.headers.get(self.cache_key)
+        if cache_key:
+            return str(cache_key)
+        return None
+
     def done(self) -> None:
         self.storage.close()
-
-
-def get_cache_key_from_flow(flow: HTTPFlow) -> str | None:
-    # 1. Try from flow metadata
-    cache_key = flow.metadata.get(ctx.options.cache_header)
-    if cache_key is not None:
-        return str(cache_key)
-    # 2. Try from request headers
-    cache_key = flow.request.headers.get(ctx.options.cache_header)
-    if cache_key is not None:
-        return str(cache_key)
-    # 3. Try from response headers
-    if not flow.response:
-        return None
-    cache_key = flow.response.headers.get(ctx.options.cache_header)
-    if cache_key:
-        return str(cache_key)
-    return None
 
 
 def generate_cache_key_by_uuid() -> str:
