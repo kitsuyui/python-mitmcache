@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import pytest
 from mitmproxy.addons import script
 from mitmproxy.test import taddons, tflow, tutils
 
 from .example_flow import example_flow
 
 
-# This filter seems not to work
-@pytest.mark.filterwarnings("ignore:'crypt' is deprecated.*?:")
 def test_load_addon() -> None:
     """Confirm that the addon can be loaded."""
     script.load_script("inject.py")
@@ -33,7 +30,6 @@ def test_simple() -> None:
         addon.done()
 
 
-@pytest.mark.filterwarnings("ignore:'crypt' is deprecated.*?:")
 def test_cache_hit() -> None:
     """Confirm that the cache hit is processed normally.
 
@@ -76,7 +72,6 @@ def test_cache_hit() -> None:
         addon.done()
 
 
-@pytest.mark.filterwarnings("ignore:'crypt' is deprecated.*?:")
 def test_get_cache_key_from_flow() -> None:
     """Confirm that the cache key is extracted from the flow."""
     with taddons.context() as tctx:
