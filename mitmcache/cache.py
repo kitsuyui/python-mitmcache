@@ -8,8 +8,8 @@ from mitmproxy import ctx, http
 from mitmproxy.addonmanager import Loader
 from mitmproxy.http import HTTPFlow
 
-from mitmcache.cache_sqlite3_storage import SQLiteCacheStorage
-from mitmcache.cache_storage import CacheStorage
+from mitmcache.storage.cache_storage import CacheStorage
+from mitmcache.storage.sqlite3 import SQLiteStorage
 
 # Environment variable for specifying the cache file path
 CACHE_FILE_ENV = "MITMPROXY_CACHE_FILE"  # default: cache.db
@@ -26,7 +26,7 @@ class Cache:
         # Initialize cache storage
         cache_file = os.environ.get(CACHE_FILE_ENV, DEFAULT_CACHE_FILE)
         # TODO: Add support for other cache storages
-        self.storage = SQLiteCacheStorage(cache_file)
+        self.storage = SQLiteStorage(cache_file)
 
     def load(self, loader: Loader) -> None:
         # Add option for specifying cache header

@@ -7,7 +7,7 @@ import mitmproxy.io as mio
 from mitmproxy import http
 
 
-class SQLiteCacheStorage:
+class SQLiteStorage:
     def __init__(self, db_path: str) -> None:
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
