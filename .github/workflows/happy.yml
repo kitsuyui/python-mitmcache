@@ -3,13 +3,15 @@ on:
   - pull_request
 
 permissions:
-  issues: write
+  contents: read
   pull-requests: write
+  issues: write
 
 jobs:
   happy:
     runs-on: ubuntu-latest
     name: happy
+    continue-on-error: true
     steps:
       - uses: kitsuyui/happy-commit@v0.8
         with:
