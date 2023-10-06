@@ -100,4 +100,8 @@ def example_flow() -> HTTPFlow:
         "id": "00000000-0000-0000-0000-000000000000",
     }
     flow = HTTPFlow.from_state(migrate_flow(data))
+    assert isinstance(flow, HTTPFlow)  # avoid following mypy error
+    # error: Incompatible return value type
+    # (got "Flow", expected "HTTPFlow")  [return-value]
+    # Because of mitmproxy's type annotation is not enough
     return flow
