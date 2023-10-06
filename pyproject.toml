@@ -7,18 +7,19 @@ readme = "README.md"
 packages = [{ include = "mitmcache" }]
 
 [tool.poetry.dependencies]
-python = "^3.9"
-mitmproxy = "^9.0.1"
+python = "^3.10"
+mitmproxy = "*"
 
 [tool.poetry.group.dev.dependencies]
-black = "^23.1.0"
-pytest = "^7.2.2"
-isort = "^5.12.0"
-pyupgrade = "^3.3.1"
-pytest-cov = "^4.0.0"
-flake8 = "^6.0.0"
-mypy = "^1.1.1"
-poethepoet = "^0.21.0"
+black = "*"
+pytest = "*"
+isort = "*"
+pyupgrade = "*"
+pytest-cov = "*"
+flake8 = "*"
+mypy = "*"
+poethepoet = "*"
+typing_extensions = "*"
 
 [build-system]
 requires = ["poetry-core"]
@@ -31,9 +32,7 @@ line_length = 79
 
 [tool.poe.tasks.proxy]
 cmd = "mitmdump -s inject.py --set cache_file=${cache_file}"
-args = [
-    { name = "cache-file", default = "cache.db" },
-]
+args = [{ name = "cache-file", default = "cache.db" }]
 
 [tool.poe.tasks.download_cert]
 shell = """
@@ -47,10 +46,7 @@ args = [{ name = "cert-path", default = "/tmp/mitm.pem" }]
 
 [tool.poe.tasks]
 coverage-xml = "pytest --cov=mitmcache tests --doctest-modules --cov-report=xml"
-format-all = [
-    { ref = "format" },
-    { cmd = "pyupgrade --py311-plus mitmcache" },
-]
+format-all = [{ ref = "format" }, { cmd = "pyupgrade --py310-plus mitmcache" }]
 
 [tool.poe.tasks.test]
 cmd = "pytest ${target}"
