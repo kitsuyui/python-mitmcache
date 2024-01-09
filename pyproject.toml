@@ -11,13 +11,9 @@ python = "^3.10"
 mitmproxy = "*"
 
 [tool.poetry.group.dev.dependencies]
-black = "*"
+ruff = "*"
 pytest = "*"
-isort = "*"
-pyupgrade = "*"
 pytest-cov = "*"
-flake8 = "*"
-mypy = "*"
 poethepoet = "*"
 typing_extensions = "*"
 
@@ -25,10 +21,8 @@ typing_extensions = "*"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-line_length = 79
+[tool.ruff]
+line-length = 79
 
 [tool.poe.tasks.proxy]
 cmd = "mitmdump -s inject.py --set cache_file=${cache_file}"
@@ -55,23 +49,16 @@ args = [
 ]
 
 [tool.poe.tasks.check]
-sequence = [
-    { cmd = "isort --check-only --diff ${target}" },
-    { cmd = "black --check --diff ${target}" },
-    { cmd = "flake8 ${target}" },
-    { cmd = "mypy ${target}" },
-]
+cmd = "ruff check ${target}"
 args = [
     { name = "target", default = "mitmcache tests", multiple = true, positional = true },
 ]
-ignore_fail = "return_non_zero"
 
 [tool.poe.tasks.format]
-sequence = [{ cmd = "isort ${target}" }, { cmd = "black ${target}" }]
+cmd = "ruff format ${target}"
 args = [
     { name = "target", default = "mitmcache tests", multiple = true, positional = true },
 ]
-ignore_fail = "return_non_zero"
 
 [tool.pytest.ini_options]
 filterwarnings = [
