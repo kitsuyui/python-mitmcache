@@ -9,6 +9,7 @@ There are many Storage classes, such as
 StorageFactory knows how to initialize them.
 So, the user of Storage does not need to know how to initialize them.
 """
+
 from __future__ import annotations
 
 from mitmproxy import ctx
