@@ -15,7 +15,7 @@ Work in progress.
 ### Download certificate
 
 ```sh
-$ poetry poe download_cert
+$ uv run poe download_cert
 ```
 
 It will download the certificate to `/tmp/mitm.pem`. You can change the path by adding the `--path` option.
@@ -23,7 +23,7 @@ It will download the certificate to `/tmp/mitm.pem`. You can change the path by 
 ### Start proxy
 
 ```sh
-$ poetry poe proxy
+$ uv run poe proxy
 ```
 
 ## Example

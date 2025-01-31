@@ -1,25 +1,46 @@
-[tool.poetry]
+[project]
 name = "mitmcache"
-version = "0.1.0"
-description = ""
-authors = ["kitsuyui <kitsuyui@kitsuyui.com>"]
-readme = "README.md"
-packages = [{ include = "mitmcache" }]
+dynamic = ["version"]
+requires-python = ">=3.10"
+dependencies = ["mitmproxy"]
+description = "A simple cache system for mitmproxy"
+readme = {file = "README.md", content-type = "text/markdown"}
+license = { file = "LICENSE" }
+authors = [
+    {name = "Yui KITSU", email = "kitsuyui+github@kitsuyui.com"}
+]
+classifiers = [
+    # https://pypi.org/classifiers/
+    "Private :: Do Not Upload",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-mitmproxy = "*"
+[project.urls]
+Homepage = "https://github.com/kitsuyui/python-mitmcache"
 
-[tool.poetry.group.dev.dependencies]
-ruff = "*"
-pytest = "*"
-pytest-cov = "*"
-poethepoet = "*"
-typing_extensions = "*"
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+    "pytest-cov",
+    "poethepoet",
+    "setuptools-scm",
+    "ruff",
+    "mypy",
+]
+
+[tool.setuptools]
+package-data = { "mitmcache" = ["py.typed"], "*" = ["README.md, LICENSE"] }
+package-dir = { "mitmcache" = "mitmcache" }
+
+[tool.setuptools_scm]
+write_to = "mitmcache/_version.py"
+version_scheme = "only-version"
+local_scheme = "no-local-version"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = [
+    "setuptools", "setuptools_scm"
+]
+build-backend = "setuptools.build_meta"
 
 [tool.ruff]
 line-length = 79

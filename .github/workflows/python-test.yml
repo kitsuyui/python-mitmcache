@@ -26,28 +26,20 @@ jobs:
         with:
           python-version: "${{ matrix.python }}"
 
-      - name: Set up poetry
-        uses: abatilo/actions-poetry@v2
-
-      - name: Cache
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pypoetry/virtualenvs
-          key: ${{ runner.os }}-build-${{ matrix.python }}-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ matrix.python }}-${{ hashFiles('**/poetry.lock') }}
-            ${{ runner.os }}-build-${{ matrix.python }}-
-            ${{ runner.os }}-
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
 
       - name: Install dependencies
-        run: poetry install
+        run: |
+          uv python pin ${{ matrix.python }}
+          uv sync
 
       - name: Lint
-        run: poetry run poe check
+        run: uv run poe check
 
       - name: Check Python version
         run: |
-          actual_version=$(poetry run python --version)
+          actual_version=$(uv run python --version)
           expected_version="Python ${{ matrix.python }}"
           if [ "$actual_version" == *"$expected_version"* ]; then
             echo "Expected $expected_version, but got $actual_version"
@@ -55,10 +47,10 @@ jobs:
           fi
 
       - name: Test
-        run: poetry run poe test
+        run: uv run poe test
 
       - name: Coverage
-        run: poetry run poe coverage-xml
+        run: uv run poe coverage-xml
 
       - name: Upload coverage report to Codecov
         if: matrix.python == '3.13'
