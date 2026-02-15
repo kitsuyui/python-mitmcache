@@ -1,5 +1,7 @@
 # mitmcache
 
+![Coverage](https://raw.githubusercontent.com/kitsuyui/octocov-central/main/badges/kitsuyui/python-mitmcache/coverage.svg)
+
 mitmcache is an addon script for mitmproxy to cache HTTP/HTTPS traffic.
 mitmproxy is a proxy server for HTTP/HTTPS traffic.
 mitmcache is a simple cache script for mitmproxy.
