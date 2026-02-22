@@ -45,6 +45,9 @@ build-backend = "setuptools.build_meta"
 [tool.ruff]
 line-length = 79
 
+[tool.ruff.lint]
+extend-select = ["UP"]
+
 [tool.poe.tasks.proxy]
 cmd = "mitmdump -s inject.py --set cache_file=${cache_file}"
 args = [{ name = "cache-file", default = "cache.db" }]
@@ -61,7 +64,7 @@ args = [{ name = "cert-path", default = "/tmp/mitm.pem" }]
 
 [tool.poe.tasks]
 coverage-xml = "pytest --cov=mitmcache tests --doctest-modules --cov-report=xml"
-format-all = [{ ref = "format" }, { cmd = "pyupgrade --py310-plus mitmcache" }]
+format-all = [{ ref = "format" }, { cmd = "ruff check --fix mitmcache" }]
 
 [tool.poe.tasks.test]
 cmd = "pytest ${target}"
