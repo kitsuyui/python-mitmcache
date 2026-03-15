@@ -2,7 +2,10 @@
 name = "mitmcache"
 dynamic = ["version"]
 requires-python = ">=3.10"
-dependencies = ["mitmproxy"]
+dependencies = [
+    "mitmproxy==10.3.0; python_version < '3.12'",
+    "mitmproxy==12.2.1; python_version >= '3.12'",
+]
 description = "A simple cache system for mitmproxy"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = { file = "LICENSE" }
