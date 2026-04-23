@@ -98,21 +98,19 @@ class Cache:
                 logger.info(f"Cache stored: {cache_key}")
 
     def get_cache_key_from_flow(self, flow: HTTPFlow) -> str | None:
-        # 1. Try from flow metadata
-        cache_key = flow.metadata.get(self.cache_key)
-        if cache_key is not None:
-            return str(cache_key)
-        # 2. Try from request headers
-        cache_key = flow.request.headers.get(self.cache_key)
-        if cache_key is not None:
-            return str(cache_key)
-        # 3. Try from response headers
-        if not flow.response:
-            return None
-        cache_key = flow.response.headers.get(self.cache_key)
-        if cache_key:
-            return str(cache_key)
+        for candidate in self.cache_key_candidates(flow):
+            if candidate:
+                return str(candidate)
         return None
+
+    def cache_key_candidates(self, flow: HTTPFlow) -> list[str | object | None]:
+        candidates: list[str | object | None] = [
+            flow.metadata.get(self.cache_key),
+            flow.request.headers.get(self.cache_key),
+        ]
+        if flow.response:
+            candidates.append(flow.response.headers.get(self.cache_key))
+        return candidates
 
     def done(self) -> None:
         self.storage.close()
