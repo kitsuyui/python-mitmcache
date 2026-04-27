@@ -18,3 +18,31 @@ def test_cache_storage() -> None:
     storage.purge("test")
     assert storage.get("test") is None
     storage.close()
+
+
+def test_cache_storage_keeps_request_metadata_order() -> None:
+    """Confirm that URL and method are stored in their schema columns."""
+    storage = SQLiteStorage(":memory:")
+    flow = example_flow()
+    storage.store("test", flow)
+
+    row = storage.conn.execute(
+        "SELECT url, method FROM cache WHERE cache_key=?",
+        ("test",),
+    ).fetchone()
+    assert row is not None
+    assert row["url"] == flow.request.url
+    assert row["method"] == flow.request.method
+
+    flow.request.method = "POST"
+    flow.request.url = "https://example.com/updated"
+    storage.update("test", flow)
+
+    row = storage.conn.execute(
+        "SELECT url, method FROM cache WHERE cache_key=?",
+        ("test",),
+    ).fetchone()
+    assert row is not None
+    assert row["url"] == flow.request.url
+    assert row["method"] == flow.request.method
+    storage.close()

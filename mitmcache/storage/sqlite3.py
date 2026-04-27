@@ -53,8 +53,8 @@ class SQLiteStorage:
             sql,
             (
                 cache_key,
-                request.method,
                 request.url,
+                request.method,
                 f.getvalue(),
             ),
         )
@@ -75,8 +75,8 @@ class SQLiteStorage:
         cursor.execute(
             sql,
             (
-                request.method,
                 request.url,
+                request.method,
                 f.getvalue(),
                 cache_key,
             ),
