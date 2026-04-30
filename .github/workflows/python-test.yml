@@ -9,6 +9,22 @@ on:
       - main
 
 jobs:
+  actionlint:
+    name: Actionlint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: Run actionlint
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -18,11 +34,11 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Set up Python
         id: setup-python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: "${{ matrix.python }}"
 
@@ -41,7 +57,7 @@ jobs:
         run: |
           actual_version=$(uv run python --version)
           expected_version="Python ${{ matrix.python }}"
-          if [ "$actual_version" == *"$expected_version"* ]; then
+          if [[ "$actual_version" != *"$expected_version"* ]]; then
             echo "Expected $expected_version, but got $actual_version"
             exit 1
           fi
@@ -51,4 +67,3 @@ jobs:
 
       - name: Coverage
         run: uv run poe coverage-xml
-
