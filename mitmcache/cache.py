@@ -59,6 +59,8 @@ class Cache:
         cache_key = self.get_cache_key_from_flow(flow)
         search_cache = True if cache_key is not None else False
 
+        cache_from_origin = True
+
         # Get response from cache
         if search_cache and cache_key:
             cache = self.storage.get(cache_key)
@@ -68,7 +70,7 @@ class Cache:
                 flow.response = cache.response
                 flow.response.headers[self.cache_key] = cache_key
                 flow.metadata[self.cache_key] = cache_key
-                flow.metadata[self.cache_from_origin] = False
+                cache_from_origin = False
         else:
             cache_key = generate_cache_key_by_uuid()
             # Remove header before sending to origin server
@@ -76,7 +78,7 @@ class Cache:
 
         # Set cache key to flow
         flow.metadata[self.cache_key] = cache_key
-        flow.metadata[self.cache_from_origin] = True
+        flow.metadata[self.cache_from_origin] = cache_from_origin
 
     def response(self, flow: http.HTTPFlow) -> None:
         """response
@@ -103,7 +105,9 @@ class Cache:
                 return str(candidate)
         return None
 
-    def cache_key_candidates(self, flow: HTTPFlow) -> list[str | object | None]:
+    def cache_key_candidates(
+        self, flow: HTTPFlow
+    ) -> list[str | object | None]:
         candidates: list[str | object | None] = [
             flow.metadata.get(self.cache_key),
             flow.request.headers.get(self.cache_key),
