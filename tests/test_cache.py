@@ -3,7 +3,33 @@ from __future__ import annotations
 from mitmproxy.addons import script
 from mitmproxy.test import taddons, tflow, tutils
 
+from mitmcache.storage.cache_storage import CacheStorage
+
 from .example_flow import example_flow
+
+
+class TrackingStorage:
+    def __init__(self, storage: CacheStorage) -> None:
+        self.storage = storage
+        self.store_count = 0
+        self.update_count = 0
+
+    def get(self, cache_key):
+        return self.storage.get(cache_key)
+
+    def store(self, cache_key, flow):
+        self.store_count += 1
+        self.storage.store(cache_key, flow)
+
+    def update(self, cache_key, flow):
+        self.update_count += 1
+        self.storage.update(cache_key, flow)
+
+    def purge(self, cache_key):
+        self.storage.purge(cache_key)
+
+    def close(self):
+        self.storage.close()
 
 
 def test_load_addon() -> None:
@@ -37,6 +63,8 @@ def test_cache_hit() -> None:
     """
     with taddons.context() as tctx:
         addon = tctx.script("inject.py").addons[0]
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
 
         flow = tflow.tflow(
             req=tutils.treq(
@@ -53,6 +81,8 @@ def test_cache_hit() -> None:
         # cache miss but the response is stored
         addon.request(flow)
         addon.response(flow)
+        assert storage.store_count == 1
+        assert storage.update_count == 0
 
         flow = tflow.tflow(
             req=tutils.treq(
@@ -68,7 +98,10 @@ def test_cache_hit() -> None:
         assert flow.response is not None
         assert flow.response.status_code == 200
         assert flow.response.text == "Hello, World!"
+        assert flow.metadata[addon.cache_from_origin] is False
         addon.response(flow)
+        assert storage.store_count == 1
+        assert storage.update_count == 0
         addon.done()
 
 
