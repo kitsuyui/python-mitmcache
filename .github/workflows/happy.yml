@@ -9,10 +9,4 @@ permissions:
 
 jobs:
   happy:
-    runs-on: ubuntu-latest
-    name: happy
-    continue-on-error: true
-    steps:
-      - uses: kitsuyui/happy-commit@v0.8
-        with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    uses: kitsuyui/gh-actions-workflows/.github/workflows/happy-commit.yml@main
