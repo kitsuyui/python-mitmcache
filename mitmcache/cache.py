@@ -35,6 +35,11 @@ class Cache:
         self.storage_factory.load(loader)
 
     def configure(self, updated: set[str]) -> None:
+        existing = getattr(self, "storage", None)
+        if existing is not None and "cache_file" not in updated:
+            return
+        if existing is not None:
+            existing.close()
         self.storage = self.storage_factory.create()
 
     @property

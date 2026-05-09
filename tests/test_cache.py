@@ -105,6 +105,36 @@ def test_cache_hit() -> None:
         addon.done()
 
 
+def test_configure_closes_previous_storage() -> None:
+    """Confirm that reconfiguring closes the previous storage."""
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        previous = TrackingStorage(addon.storage)
+        addon.storage = previous
+        previous.close_count = 0
+
+        original_close = previous.close
+
+        def tracked_close() -> None:
+            previous.close_count += 1
+            original_close()
+
+        previous.close = tracked_close  # type: ignore[method-assign]
+
+        # Re-applying configure with cache_file in the updated set should
+        # close the previous storage and create a fresh one.
+        addon.configure({"cache_file"})
+        assert previous.close_count == 1
+        assert addon.storage is not previous
+
+        # configure with an unrelated option should not recreate storage.
+        current = addon.storage
+        addon.configure({"cache_key"})
+        assert addon.storage is current
+
+        addon.done()
+
+
 def test_get_cache_key_from_flow() -> None:
     """Confirm that the cache key is extracted from the flow."""
     with taddons.context() as tctx:
