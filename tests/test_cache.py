@@ -135,6 +135,48 @@ def test_configure_closes_previous_storage() -> None:
         addon.done()
 
 
+def test_cache_key_header_stripped_before_origin() -> None:
+    """`Mitm-Cache-Key` request header must not leak to the origin server.
+
+    Covers cache miss (storage returns None) and the no-cache-key path. The
+    cache hit case is already exercised by `test_cache_hit`; the request is
+    short-circuited there so no origin call happens regardless.
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+
+        # case1. cache key supplied but cache miss -> request is forwarded
+        # to origin, header must be stripped first.
+        flow_miss = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"miss-key")],
+            ),
+            resp=False,
+        )
+        addon.request(flow_miss)
+        assert flow_miss.response is None
+        assert addon.cache_key not in flow_miss.request.headers
+        assert flow_miss.metadata[addon.cache_key] == "miss-key"
+
+        # case2. no cache key -> auto-uuid path, header should be absent
+        # before forwarding to origin.
+        flow_nokey = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+            ),
+            resp=False,
+        )
+        addon.request(flow_nokey)
+        assert addon.cache_key not in flow_nokey.request.headers
+
+        addon.done()
+
+
 def test_get_cache_key_from_flow() -> None:
     """Confirm that the cache key is extracted from the flow."""
     with taddons.context() as tctx:
