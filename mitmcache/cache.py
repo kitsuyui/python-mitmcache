@@ -62,6 +62,10 @@ class Cache:
         """
         # Get cache key or create it from request headers
         cache_key = self.get_cache_key_from_flow(flow)
+        # Cache key header is a proxy-internal hint; never forward it to the
+        # origin regardless of cache hit / miss / no-key. Pop once here so
+        # all branches stay symmetric and a future branch cannot leak it.
+        flow.request.headers.pop(self.cache_key, None)
         search_cache = True if cache_key is not None else False
 
         cache_from_origin = True
@@ -78,8 +82,6 @@ class Cache:
                 cache_from_origin = False
         else:
             cache_key = generate_cache_key_by_uuid()
-            # Remove header before sending to origin server
-            flow.request.headers.pop(self.cache_key, None)
 
         # Set cache key to flow
         flow.metadata[self.cache_key] = cache_key
