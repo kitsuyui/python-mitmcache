@@ -13,6 +13,7 @@ class TrackingStorage:
         self.storage = storage
         self.store_count = 0
         self.update_count = 0
+        self.purge_count = 0
 
     def get(self, cache_key):
         return self.storage.get(cache_key)
@@ -26,6 +27,7 @@ class TrackingStorage:
         self.storage.update(cache_key, flow)
 
     def purge(self, cache_key):
+        self.purge_count += 1
         self.storage.purge(cache_key)
 
     def close(self):
@@ -102,6 +104,44 @@ def test_cache_hit() -> None:
         addon.response(flow)
         assert storage.store_count == 1
         assert storage.update_count == 0
+        addon.done()
+
+
+def test_cache_entry_without_response_is_ignored() -> None:
+    """Confirm that an incomplete cached flow does not short-circuit."""
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
+
+        cached_flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+            ),
+            resp=False,
+        )
+        storage.store("empty-response", cached_flow)
+        assert storage.store_count == 1
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"empty-response")],
+            ),
+            resp=False,
+        )
+
+        addon.request(flow)
+
+        assert flow.response is None
+        assert addon.cache_key not in flow.request.headers
+        assert flow.metadata[addon.cache_key] == "empty-response"
+        assert flow.metadata[addon.cache_from_origin] is True
+        assert storage.purge_count == 1
         addon.done()
 
 
