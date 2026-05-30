@@ -217,6 +217,52 @@ def test_request_and_response_after_done_are_no_ops() -> None:
         assert addon._closed is False
 
 
+def test_cache_key_header_not_leaked_to_client() -> None:
+    """Internal cache key header must not appear in the response seen by clients.
+
+    On a cache hit, the addon must not expose the proxy-internal
+    header to downstream consumers.
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+
+        # First request: populate the cache.
+        flow_store = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"leak-test-key")],
+            ),
+            resp=tutils.tresp(
+                content=b"Cached body",
+                status_code=200,
+            ),
+        )
+        addon.request(flow_store)
+        addon.response(flow_store)
+
+        # Second request: cache hit.
+        flow_hit = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"leak-test-key")],
+            ),
+            resp=False,
+        )
+        addon.request(flow_hit)
+        assert flow_hit.response is not None
+        addon.response(flow_hit)
+
+        # The internal header must not be present in the response forwarded to
+        # the client.
+        assert addon.cache_key not in flow_hit.response.headers
+
+        addon.done()
+
+
 def test_get_cache_key_from_flow() -> None:
     """Confirm that the cache key is extracted from the flow."""
     with taddons.context() as tctx:
