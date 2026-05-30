@@ -72,7 +72,14 @@ class Cache:
 
         # Get response from cache
         if search_cache and cache_key:
-            cache = self.storage.get(cache_key)
+            try:
+                cache = self.storage.get(cache_key)
+            except Exception:
+                logger.exception(
+                    "Cache storage read failed for key %s; bypassing cache",
+                    cache_key,
+                )
+                cache = None
             if cache is not None:
                 assert cache.response is not None
                 logger.info(f"Cache hit: {cache_key}")
@@ -98,13 +105,19 @@ class Cache:
         # Check if the response has a cache key
         cache_key = self.get_cache_key_from_flow(flow)
         if flow.metadata.get(self.cache_from_origin, False) and cache_key:
-            cache = self.storage.get(cache_key)
-            if cache is not None:
-                self.storage.update(cache_key, flow)
-                logger.info(f"Cache updated: {cache_key}")
-            else:
-                self.storage.store(cache_key, flow)
-                logger.info(f"Cache stored: {cache_key}")
+            try:
+                cache = self.storage.get(cache_key)
+                if cache is not None:
+                    self.storage.update(cache_key, flow)
+                    logger.info(f"Cache updated: {cache_key}")
+                else:
+                    self.storage.store(cache_key, flow)
+                    logger.info(f"Cache stored: {cache_key}")
+            except Exception:
+                logger.exception(
+                    "Cache storage write failed for key %s; response not cached",
+                    cache_key,
+                )
 
     def get_cache_key_from_flow(self, flow: HTTPFlow) -> str | None:
         for candidate in self.cache_key_candidates(flow):
