@@ -8,7 +8,8 @@ from mitmproxy import http
 
 
 class SQLiteStorage:
-    def __init__(self, db_path: str) -> None:
+    def __init__(self, db_path: str, max_entries: int | None = None) -> None:
+        self.max_entries = max_entries
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
         cursor = self.conn.cursor()
@@ -59,6 +60,8 @@ class SQLiteStorage:
             ),
         )
         self.conn.commit()
+        if self.max_entries is not None:
+            self._evict()
 
     def update(self, cache_key: str, flow: http.HTTPFlow) -> None:
         request = flow.request
@@ -80,6 +83,17 @@ class SQLiteStorage:
                 f.getvalue(),
                 cache_key,
             ),
+        )
+        self.conn.commit()
+
+    def _evict(self) -> None:
+        if self.max_entries is None:
+            return
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "DELETE FROM cache WHERE id NOT IN "
+            "(SELECT id FROM cache ORDER BY id DESC LIMIT ?)",
+            (self.max_entries,),
         )
         self.conn.commit()
 

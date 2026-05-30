@@ -46,3 +46,29 @@ def test_cache_storage_keeps_request_metadata_order() -> None:
     assert row["url"] == flow.request.url
     assert row["method"] == flow.request.method
     storage.close()
+
+
+def test_max_entries_evicts_oldest_on_store() -> None:
+    """Oldest entries are removed when max_entries is exceeded."""
+    storage = SQLiteStorage(":memory:", max_entries=2)
+    flow = example_flow()
+    storage.store("key1", flow)
+    storage.store("key2", flow)
+    storage.store("key3", flow)
+
+    assert storage.get("key1") is None
+    assert storage.get("key2") is not None
+    assert storage.get("key3") is not None
+    storage.close()
+
+
+def test_max_entries_zero_means_unlimited() -> None:
+    """max_entries=None keeps all entries (default unlimited behaviour)."""
+    storage = SQLiteStorage(":memory:", max_entries=None)
+    flow = example_flow()
+    for i in range(10):
+        storage.store(f"key{i}", flow)
+
+    count = storage.conn.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
+    assert count == 10
+    storage.close()
