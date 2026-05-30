@@ -93,6 +93,31 @@ class SQLiteStorage:
             logger.warning("update() noop: cache_key %r not found", cache_key)
         self.conn.commit()
 
+    def upsert(self, cache_key: str, flow: http.HTTPFlow) -> None:
+        request = flow.request
+        cursor = self.conn.cursor()
+        f = io.BytesIO()
+        w = mio.FlowWriter(f)
+        w.add(flow)
+        sql = """\
+        INSERT OR REPLACE INTO cache
+                  ( cache_key
+                  , url
+                  , method
+                  , flow
+                  )
+             VALUES (?, ?, ?, ?)"""
+        cursor.execute(
+            sql,
+            (
+                cache_key,
+                request.url,
+                request.method,
+                f.getvalue(),
+            ),
+        )
+        self.conn.commit()
+
     def purge(self, cache_key: str) -> None:
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM cache WHERE cache_key=?", (cache_key,))

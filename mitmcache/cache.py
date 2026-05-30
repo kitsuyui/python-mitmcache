@@ -110,13 +110,8 @@ class Cache:
         # Check if the response has a cache key
         cache_key = self.get_cache_key_from_flow(flow)
         if flow.metadata.get(self.cache_from_origin, False) and cache_key:
-            cache = self.storage.get(cache_key)
-            if cache is not None:
-                self.storage.update(cache_key, flow)
-                logger.info(f"Cache updated: {_sanitize_for_log(cache_key)}")
-            else:
-                self.storage.store(cache_key, flow)
-                logger.info(f"Cache stored: {_sanitize_for_log(cache_key)}")
+            self.storage.upsert(cache_key, flow)
+            logger.info(f"Cache stored: {_sanitize_for_log(cache_key)}")
 
     def get_cache_key_from_flow(self, flow: HTTPFlow) -> str | None:
         for candidate in self.cache_key_candidates(flow):
