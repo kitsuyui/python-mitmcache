@@ -132,6 +132,11 @@ def test_configure_closes_previous_storage() -> None:
         addon.configure({"cache_key"})
         assert addon.storage is current
 
+        # configure with cache_max_entries must recreate storage so the new
+        # value takes effect.
+        addon.configure({"cache_max_entries"})
+        assert addon.storage is not current
+
         addon.done()
 
 
