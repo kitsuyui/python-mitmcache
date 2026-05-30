@@ -38,9 +38,9 @@ class Cache:
         existing = getattr(self, "storage", None)
         if existing is not None and "cache_file" not in updated:
             return
+        self.storage = self.storage_factory.create()
         if existing is not None:
             existing.close()
-        self.storage = self.storage_factory.create()
 
     @property
     def cache_key(self) -> str:
