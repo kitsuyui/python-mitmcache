@@ -89,3 +89,50 @@ def test_max_entries_zero_means_unlimited() -> None:
     count = storage.conn.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
     assert count == 10
     storage.close()
+
+
+def test_update_refreshes_eviction_order() -> None:
+    """update() must refresh last_accessed_at so that updated entries are not evicted first.
+
+    With max_entries=2 and three distinct store operations, the entry updated
+    most recently should survive eviction while the untouched entry is dropped.
+    """
+    storage = SQLiteStorage(":memory:", max_entries=2)
+    flow = example_flow()
+    storage.store("key1", flow)
+    storage.store("key2", flow)
+    # key1 and key2 are now both present (at capacity).
+    # Update key1 — this refreshes its last_accessed_at to "now".
+    storage.update("key1", flow)
+    # Store key3 — eviction runs; key2 (least recently accessed) should be evicted.
+    storage.store("key3", flow)
+
+    assert storage.get("key2") is None, (
+        "key2 should have been evicted (least recently used)"
+    )
+    assert storage.get("key1") is not None, (
+        "key1 should survive (updated recently)"
+    )
+    assert storage.get("key3") is not None, "key3 should survive (just stored)"
+    storage.close()
+
+
+def test_get_refreshes_eviction_order() -> None:
+    """get() must refresh last_accessed_at so that accessed entries are not evicted first."""
+    storage = SQLiteStorage(":memory:", max_entries=2)
+    flow = example_flow()
+    storage.store("key1", flow)
+    storage.store("key2", flow)
+    # Access key1 — this refreshes its last_accessed_at.
+    assert storage.get("key1") is not None
+    # Store key3 — eviction runs; key2 (least recently accessed) should be evicted.
+    storage.store("key3", flow)
+
+    assert storage.get("key2") is None, (
+        "key2 should have been evicted (least recently accessed)"
+    )
+    assert storage.get("key1") is not None, (
+        "key1 should survive (recently accessed)"
+    )
+    assert storage.get("key3") is not None, "key3 should survive (just stored)"
+    storage.close()
