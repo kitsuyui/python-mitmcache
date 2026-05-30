@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import io
+import logging
 import sqlite3
 
 import mitmproxy.io as mio
 from mitmproxy import http
+
+logger = logging.getLogger(__name__)
 
 
 class SQLiteStorage:
@@ -81,6 +84,8 @@ class SQLiteStorage:
                 cache_key,
             ),
         )
+        if cursor.rowcount == 0:
+            logger.warning("update() noop: cache_key %r not found", cache_key)
         self.conn.commit()
 
     def purge(self, cache_key: str) -> None:
