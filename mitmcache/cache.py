@@ -109,14 +109,22 @@ class Cache:
             return
         # Check if the response has a cache key
         cache_key = self.get_cache_key_from_flow(flow)
-        if flow.metadata.get(self.cache_from_origin, False) and cache_key:
-            cache = self.storage.get(cache_key)
-            if cache is not None:
-                self.storage.update(cache_key, flow)
-                logger.info(f"Cache updated: {_sanitize_for_log(cache_key)}")
-            else:
-                self.storage.store(cache_key, flow)
-                logger.info(f"Cache stored: {_sanitize_for_log(cache_key)}")
+        if not (flow.metadata.get(self.cache_from_origin, False) and cache_key):
+            return
+        # Do not cache error responses; a cached 4xx/5xx would be served
+        # indefinitely even after the origin recovers.
+        if flow.response is None or flow.response.status_code >= 400:
+            return
+        self._store_or_update(cache_key, flow)
+
+    def _store_or_update(self, cache_key: str, flow: http.HTTPFlow) -> None:
+        cache = self.storage.get(cache_key)
+        if cache is not None:
+            self.storage.update(cache_key, flow)
+            logger.info(f"Cache updated: {_sanitize_for_log(cache_key)}")
+        else:
+            self.storage.store(cache_key, flow)
+            logger.info(f"Cache stored: {_sanitize_for_log(cache_key)}")
 
     def get_cache_key_from_flow(self, flow: HTTPFlow) -> str | None:
         for candidate in self.cache_key_candidates(flow):
