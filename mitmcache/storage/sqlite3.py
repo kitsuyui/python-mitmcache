@@ -81,9 +81,9 @@ class SQLiteStorage:
                 _now(),
             ),
         )
-        self.conn.commit()
         if self.max_entries is not None:
             self._evict()
+        self.conn.commit()
 
     def update(self, cache_key: str, flow: http.HTTPFlow) -> None:
         request = flow.request
@@ -108,9 +108,9 @@ class SQLiteStorage:
                 cache_key,
             ),
         )
-        self.conn.commit()
         if self.max_entries is not None:
             self._evict()
+        self.conn.commit()
 
     def _evict(self) -> None:
         if self.max_entries is None:
@@ -123,7 +123,6 @@ class SQLiteStorage:
             "(SELECT id FROM cache ORDER BY last_accessed_at DESC, id DESC LIMIT ?)",
             (self.max_entries,),
         )
-        self.conn.commit()
 
     def purge(self, cache_key: str) -> None:
         cursor = self.conn.cursor()
