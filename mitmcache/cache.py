@@ -33,6 +33,15 @@ class Cache:
             " response should be fetched from the origin (not an HTTP"
             " header name).",
         )
+        loader.add_option(
+            name="cache_max_body_size",
+            typespec=int,
+            default=0,
+            help=(
+                "Maximum response body size in bytes to cache. "
+                "0 means no limit. Responses larger than this are skipped."
+            ),
+        )
         self.storage_factory = StorageFactory()
         self.storage_factory.load(loader)
 
@@ -116,6 +125,15 @@ class Cache:
         # Do not cache error responses; a cached 4xx/5xx would be served
         # indefinitely even after the origin recovers.
         if flow.response is None or flow.response.status_code >= 400:
+            return
+        max_size = int(ctx.options.cache_max_body_size)
+        if max_size > 0 and len(flow.response.content) > max_size:
+            logger.warning(
+                f"Cache skipped: body "
+                f"{len(flow.response.content)} bytes "
+                f"> cache_max_body_size {max_size} "
+                f"({_sanitize_for_log(cache_key)})"
+            )
             return
         try:
             self.storage.upsert(cache_key, flow)
