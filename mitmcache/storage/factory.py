@@ -16,7 +16,9 @@ from .sqlite3 import SQLiteStorage
 
 class StorageFactory:
     def create(self) -> CacheStorage:
-        return SQLiteStorage(ctx.options.cache_file)
+        raw = int(ctx.options.cache_max_entries)
+        max_entries = raw if raw > 0 else None
+        return SQLiteStorage(ctx.options.cache_file, max_entries=max_entries)
 
     def load(self, loader: Loader) -> None:
         loader.add_option(
@@ -24,4 +26,10 @@ class StorageFactory:
             typespec=str,
             default=":memory:",
             help="Cache file path for SQLite3 storage.",
+        )
+        loader.add_option(
+            name="cache_max_entries",
+            typespec=int,
+            default=0,
+            help="Maximum number of entries in the SQLite cache. 0 = unlimited.",
         )
