@@ -66,9 +66,13 @@ args = [{ name = "cache-file", default = "cache.db" }]
 shell = """
 mitmdump &
 PID=$!
-sleep 3
-curl -x 127.0.0.1:8080 'http://mitm.it/cert/pem' -o ${cert_path}
-kill $PID
+trap 'kill $PID 2>/dev/null' EXIT
+for i in $(seq 1 30); do
+    curl -s -x 127.0.0.1:8080 'http://mitm.it/cert/pem' -o ${cert_path} && exit 0
+    sleep 1
+done
+echo "Error: mitmproxy did not become ready within 30 seconds" >&2
+exit 1
 """
 args = [{ name = "cert-path", default = "/tmp/mitm.pem" }]
 
