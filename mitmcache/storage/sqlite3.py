@@ -46,8 +46,13 @@ class SQLiteStorage:
             # version; deserialization may silently fail or raise.
             if stored_version != _MITMPROXY_VERSION:
                 return None
-            for flow in mio.FlowReader(io.BytesIO(row["flow"])).stream():
-                return flow  # type: ignore
+            try:
+                return next(  # type: ignore[return-value]
+                    iter(mio.FlowReader(io.BytesIO(row["flow"])).stream()),
+                    None,
+                )
+            except Exception:
+                return None
 
         return None
 

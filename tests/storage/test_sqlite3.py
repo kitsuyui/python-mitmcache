@@ -84,6 +84,22 @@ def test_cache_storage_version_mismatch_returns_none() -> None:
     storage.close()
 
 
+def test_cache_storage_corrupt_blob_returns_none() -> None:
+    """Confirm that a corrupt BLOB does not crash get() and returns None."""
+    storage = SQLiteStorage(":memory:")
+    flow = example_flow()
+    storage.store("test", flow)
+
+    storage.conn.execute(
+        "UPDATE cache SET flow=? WHERE cache_key=?",
+        (b"not-a-valid-flow-blob", "test"),
+    )
+    storage.conn.commit()
+
+    assert storage.get("test") is None
+    storage.close()
+
+
 def test_cache_storage_migrates_existing_db() -> None:
     """Confirm that existing DBs without the version column are migrated."""
     import sqlite3 as _sqlite3
