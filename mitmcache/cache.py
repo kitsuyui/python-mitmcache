@@ -28,8 +28,9 @@ class Cache:
             name="cache_from_origin",
             typespec=str,
             default="Mitm-Cache-From-Origin",
-            help="Header used to determine\
- whether the request is from the origin",
+            help="flow.metadata key used internally to track whether the"
+            " response should be fetched from the origin (not an HTTP"
+            " header name).",
         )
         self.storage_factory = StorageFactory()
         self.storage_factory.load(loader)
