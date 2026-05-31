@@ -235,3 +235,27 @@ def test_get_cache_key_from_flow() -> None:
         assert addon.get_cache_key_from_flow(flow) is None
 
         addon.done()
+
+
+def test_storage_factory_invalid_max_entries_defaults_to_unlimited() -> None:
+    """StorageFactory.create() must not raise on non-integer cache_max_entries.
+
+    mitmproxy's typespec=int normally prevents this, but defensive coding
+    requires a try/except guard for edge cases such as typespec bypass or
+    future runtime changes.
+    """
+    from unittest.mock import MagicMock, patch
+
+    from mitmcache.storage.factory import StorageFactory
+
+    factory = StorageFactory()
+    mock_options = MagicMock()
+    mock_options.cache_max_entries = "not-an-int"
+    mock_options.cache_file = ":memory:"
+
+    with patch("mitmcache.storage.factory.ctx") as mock_ctx:
+        mock_ctx.options = mock_options
+        storage = factory.create()
+
+    assert storage is not None
+    storage.close()

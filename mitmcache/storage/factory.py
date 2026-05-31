@@ -12,16 +12,26 @@ So, the user of Storage does not need to know how to initialize them.
 
 from __future__ import annotations
 
+import logging
+
 from mitmproxy import ctx
 from mitmproxy.addonmanager import Loader
 
 from .cache_storage import CacheStorage
 from .sqlite3 import SQLiteStorage
 
+logger = logging.getLogger(__name__)
+
 
 class StorageFactory:
     def create(self) -> CacheStorage:
-        raw = int(ctx.options.cache_max_entries)
+        try:
+            raw = int(ctx.options.cache_max_entries)
+        except (ValueError, TypeError):
+            logger.warning(
+                "cache_max_entries is not a valid integer; defaulting to unlimited."
+            )
+            raw = 0
         max_entries = raw if raw > 0 else None
         return SQLiteStorage(ctx.options.cache_file, max_entries=max_entries)
 
