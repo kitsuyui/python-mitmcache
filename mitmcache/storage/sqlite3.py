@@ -30,8 +30,9 @@ class SQLiteStorage:
         cursor.execute("SELECT * FROM cache WHERE cache_key=?", (cache_key,))
         row = cursor.fetchone()
         if row:
-            for flow in mio.FlowReader(io.BytesIO(row["flow"])).stream():
-                return flow  # type: ignore
+            with io.BytesIO(row["flow"]) as buf:
+                for flow in mio.FlowReader(buf).stream():
+                    return flow  # type: ignore
 
         return None
 
