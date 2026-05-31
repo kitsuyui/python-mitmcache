@@ -41,6 +41,7 @@ class Cache:
         if existing is not None:
             existing.close()
         self.storage = self.storage_factory.create()
+        self._closed = False
 
     @property
     def cache_key(self) -> str:
@@ -60,6 +61,9 @@ class Cache:
         3. If the request doesn't have a cache key,
           generate a cache key and set it to the response headers.
         """
+        if getattr(self, "_closed", False):
+            logger.warning("Cache.request() called after done(); skipping.")
+            return
         # Get cache key or create it from request headers
         cache_key = self.get_cache_key_from_flow(flow)
         # Cache key header is a proxy-internal hint; never forward it to the
@@ -94,7 +98,9 @@ class Cache:
         2. If the response doesn't have a cache key,
            that means the request has sent to the origin and it will be cached.
         """
-
+        if getattr(self, "_closed", False):
+            logger.warning("Cache.response() called after done(); skipping.")
+            return
         # Check if the response has a cache key
         cache_key = self.get_cache_key_from_flow(flow)
         if flow.metadata.get(self.cache_from_origin, False) and cache_key:
@@ -125,6 +131,7 @@ class Cache:
 
     def done(self) -> None:
         self.storage.close()
+        self._closed = True
 
 
 def generate_cache_key_by_uuid() -> str:

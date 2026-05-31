@@ -177,6 +177,40 @@ def test_cache_key_header_stripped_before_origin() -> None:
         addon.done()
 
 
+def test_request_and_response_after_done_are_no_ops() -> None:
+    """request() and response() called after done() must not raise.
+
+    Verifies the CLOSED state guard introduced to prevent
+    sqlite3.ProgrammingError when mitmproxy calls hooks after done().
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
+
+        addon.done()
+        assert addon._closed is True
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"key1")],
+            ),
+            resp=tutils.tresp(content=b"body"),
+        )
+        # Neither call should raise or touch storage.
+        addon.request(flow)
+        addon.response(flow)
+        assert storage.store_count == 0
+        assert storage.update_count == 0
+
+        # configure() reopens storage and clears the closed flag.
+        addon.configure({"cache_file"})
+        assert addon._closed is False
+
+
 def test_get_cache_key_from_flow() -> None:
     """Confirm that the cache key is extracted from the flow."""
     with taddons.context() as tctx:
