@@ -234,4 +234,16 @@ def test_get_cache_key_from_flow() -> None:
         )
         assert addon.get_cache_key_from_flow(flow) is None
 
+        # case5. empty header value is a valid cache key (not silently skipped)
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"")],
+            ),
+            resp=False,
+        )
+        assert addon.get_cache_key_from_flow(flow) == ""
+
         addon.done()
