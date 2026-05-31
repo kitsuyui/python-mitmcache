@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import re
-from uuid import uuid4
 
 from mitmproxy import ctx, http
 from mitmproxy.addonmanager import Loader
@@ -73,28 +72,24 @@ class Cache:
           set the response to the cached response.
         2. If the request has a cache key but doesn't exist in the cache,
           request to the origin server without cache key header.
-        3. If the request doesn't have a cache key,
-          generate a cache key and set it to the response headers.
+        3. If the request doesn't have a cache key, forward to origin without
+          caching (no UUID fallback — keyless requests are not cacheable).
         """
         if getattr(self, "_closed", False):
             logger.warning("Cache.request() called after done(); skipping.")
             return
-        # Get cache key or create it from request headers
+        # Get cache key from request headers
         cache_key = self.get_cache_key_from_flow(flow)
         # Cache key header is a proxy-internal hint; never forward it to the
         # origin regardless of cache hit / miss / no-key. Pop once here so
         # all branches stay symmetric and a future branch cannot leak it.
         flow.request.headers.pop(self.cache_key, None)
-        search_cache = True if cache_key is not None else False
 
         cache_from_origin = True
 
         # Get response from cache
-        if search_cache and cache_key:
-            if self._set_cached_response(flow, cache_key):
-                cache_from_origin = False
-        else:
-            cache_key = generate_cache_key_by_uuid()
+        if cache_key is not None and self._set_cached_response(flow, cache_key):
+            cache_from_origin = False
 
         # Set cache key to flow
         flow.metadata[self.cache_key] = cache_key
@@ -202,11 +197,6 @@ class Cache:
         if storage is not None:
             storage.close()
         self._closed = True
-
-
-def generate_cache_key_by_uuid() -> str:
-    # Generate cache key by uuid
-    return str(uuid4())
 
 
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")

@@ -247,8 +247,7 @@ def test_cache_key_header_stripped_before_origin() -> None:
         assert addon.cache_key not in flow_miss.request.headers
         assert flow_miss.metadata[addon.cache_key] == "miss-key"
 
-        # case2. no cache key -> auto-uuid path, header should be absent
-        # before forwarding to origin.
+        # case2. no cache key -> forwarded to origin without caching.
         flow_nokey = tflow.tflow(
             req=tutils.treq(
                 method=b"GET",
@@ -259,6 +258,7 @@ def test_cache_key_header_stripped_before_origin() -> None:
         )
         addon.request(flow_nokey)
         assert addon.cache_key not in flow_nokey.request.headers
+        assert flow_nokey.metadata[addon.cache_key] is None
 
         addon.done()
 
@@ -295,7 +295,6 @@ def test_request_and_response_after_done_are_no_ops() -> None:
         # configure() reopens storage and clears the closed flag.
         addon.configure({"cache_file"})
         assert addon._closed is False
-
 
 def test_error_response_not_cached() -> None:
     """Error responses (4xx/5xx) must not be stored in the cache.
@@ -401,6 +400,35 @@ def test_large_response_skipped_when_max_body_size_set() -> None:
         assert storage.store_count == 0
         assert storage.update_count == 0
         assert storage.upsert_count == 0
+        addon.done()
+
+
+def test_keyless_request_not_cached() -> None:
+    """Requests without a cache key must not be stored in the cache.
+
+    Previously a random UUID was assigned per request, causing unbounded
+    cache growth with entries that can never be reused. The fix removes
+    the UUID fallback entirely so keyless requests pass through to origin
+    without writing to storage.
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+            ),
+            resp=tutils.tresp(content=b"Hello"),
+        )
+        addon.request(flow)
+        addon.response(flow)
+
+        assert storage.store_count == 0
+        assert storage.update_count == 0
         addon.done()
 
 
