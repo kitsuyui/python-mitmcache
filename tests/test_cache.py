@@ -3,6 +3,7 @@ from __future__ import annotations
 from mitmproxy.addons import script
 from mitmproxy.test import taddons, tflow, tutils
 
+from mitmcache.cache import _sanitize_for_log
 from mitmcache.storage.cache_storage import CacheStorage
 
 from .example_flow import example_flow
@@ -235,3 +236,12 @@ def test_get_cache_key_from_flow() -> None:
         assert addon.get_cache_key_from_flow(flow) is None
 
         addon.done()
+
+
+def test_sanitize_for_log() -> None:
+    """Control characters in cache keys must be escaped before logging."""
+    assert _sanitize_for_log("normal-key") == "normal-key"
+    assert _sanitize_for_log("key\nINFO fake") == "key\\x0aINFO fake"
+    assert _sanitize_for_log("key\r\n") == "key\\x0d\\x0a"
+    assert _sanitize_for_log("\x1b[31mred\x1b[0m") == "\\x1b[31mred\\x1b[0m"
+    assert _sanitize_for_log("") == ""

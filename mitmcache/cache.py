@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from uuid import uuid4
 
 from mitmproxy import ctx, http
@@ -75,7 +76,7 @@ class Cache:
             cache = self.storage.get(cache_key)
             if cache is not None:
                 assert cache.response is not None
-                logger.info(f"Cache hit: {cache_key}")
+                logger.info(f"Cache hit: {_sanitize_for_log(cache_key)}")
                 flow.response = cache.response
                 flow.response.headers[self.cache_key] = cache_key
                 flow.metadata[self.cache_key] = cache_key
@@ -101,10 +102,10 @@ class Cache:
             cache = self.storage.get(cache_key)
             if cache is not None:
                 self.storage.update(cache_key, flow)
-                logger.info(f"Cache updated: {cache_key}")
+                logger.info(f"Cache updated: {_sanitize_for_log(cache_key)}")
             else:
                 self.storage.store(cache_key, flow)
-                logger.info(f"Cache stored: {cache_key}")
+                logger.info(f"Cache stored: {_sanitize_for_log(cache_key)}")
 
     def get_cache_key_from_flow(self, flow: HTTPFlow) -> str | None:
         for candidate in self.cache_key_candidates(flow):
@@ -130,3 +131,11 @@ class Cache:
 def generate_cache_key_by_uuid() -> str:
     # Generate cache key by uuid
     return str(uuid4())
+
+
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _sanitize_for_log(value: str) -> str:
+    """Escape control characters so external input cannot inject log lines."""
+    return _CONTROL_CHARS_RE.sub(lambda m: f"\\x{ord(m.group()):02x}", value)
