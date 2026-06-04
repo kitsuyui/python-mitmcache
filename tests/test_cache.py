@@ -3,6 +3,7 @@ from __future__ import annotations
 from mitmproxy.addons import script
 from mitmproxy.test import taddons, tflow, tutils
 
+from mitmcache.cache import _sanitize_for_log
 from mitmcache.storage.cache_storage import CacheStorage
 
 from .example_flow import example_flow
@@ -172,6 +173,11 @@ def test_configure_closes_previous_storage() -> None:
         addon.configure({"cache_key"})
         assert addon.storage is current
 
+        # configure with cache_max_entries must recreate storage so the new
+        # value takes effect.
+        addon.configure({"cache_max_entries"})
+        assert addon.storage is not current
+
         addon.done()
 
 
@@ -215,6 +221,40 @@ def test_cache_key_header_stripped_before_origin() -> None:
         assert addon.cache_key not in flow_nokey.request.headers
 
         addon.done()
+
+
+def test_request_and_response_after_done_are_no_ops() -> None:
+    """request() and response() called after done() must not raise.
+
+    Verifies the CLOSED state guard introduced to prevent
+    sqlite3.ProgrammingError when mitmproxy calls hooks after done().
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
+
+        addon.done()
+        assert addon._closed is True
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"key1")],
+            ),
+            resp=tutils.tresp(content=b"body"),
+        )
+        # Neither call should raise or touch storage.
+        addon.request(flow)
+        addon.response(flow)
+        assert storage.store_count == 0
+        assert storage.update_count == 0
+
+        # configure() reopens storage and clears the closed flag.
+        addon.configure({"cache_file"})
+        assert addon._closed is False
 
 
 def test_get_cache_key_from_flow() -> None:
@@ -274,4 +314,25 @@ def test_get_cache_key_from_flow() -> None:
         )
         assert addon.get_cache_key_from_flow(flow) is None
 
+        # case5. empty header value is a valid cache key (not silently skipped)
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"")],
+            ),
+            resp=False,
+        )
+        assert addon.get_cache_key_from_flow(flow) == ""
+
         addon.done()
+
+
+def test_sanitize_for_log() -> None:
+    """Control characters in cache keys must be escaped before logging."""
+    assert _sanitize_for_log("normal-key") == "normal-key"
+    assert _sanitize_for_log("key\nINFO fake") == "key\\x0aINFO fake"
+    assert _sanitize_for_log("key\r\n") == "key\\x0d\\x0a"
+    assert _sanitize_for_log("\x1b[31mred\x1b[0m") == "\\x1b[31mred\\x1b[0m"
+    assert _sanitize_for_log("") == ""

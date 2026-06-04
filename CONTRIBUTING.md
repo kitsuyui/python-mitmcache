@@ -25,6 +25,12 @@ Run lint checks:
 uv run poe check
 ```
 
+Run type checks:
+
+```sh
+uv run poe typecheck
+```
+
 Run the test suite:
 
 ```sh
