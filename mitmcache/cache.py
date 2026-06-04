@@ -126,14 +126,7 @@ class Cache:
         # indefinitely even after the origin recovers.
         if flow.response is None or flow.response.status_code >= 400:
             return
-        max_size = int(ctx.options.cache_max_body_size)
-        if max_size > 0 and len(flow.response.content) > max_size:
-            logger.warning(
-                f"Cache skipped: body "
-                f"{len(flow.response.content)} bytes "
-                f"> cache_max_body_size {max_size} "
-                f"({_sanitize_for_log(cache_key)})"
-            )
+        if self._response_body_exceeds_limit(flow, cache_key):
             return
         try:
             self.storage.upsert(cache_key, flow)
@@ -143,6 +136,24 @@ class Cache:
                 "Cache storage write failed for key %s; response not cached",
                 _sanitize_for_log(cache_key),
             )
+
+    def _response_body_exceeds_limit(
+        self, flow: http.HTTPFlow, cache_key: str
+    ) -> bool:
+        max_size = int(ctx.options.cache_max_body_size)
+        if (
+            max_size > 0
+            and flow.response is not None
+            and len(flow.response.content) > max_size
+        ):
+            logger.warning(
+                f"Cache skipped: body "
+                f"{len(flow.response.content)} bytes "
+                f"> cache_max_body_size {max_size} "
+                f"({_sanitize_for_log(cache_key)})"
+            )
+            return True
+        return False
 
     def _set_cached_response(self, flow: HTTPFlow, cache_key: str) -> bool:
         """Best-effort cache read; storage failures bypass the cache."""
