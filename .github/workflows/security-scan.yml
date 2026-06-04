@@ -1,0 +1,42 @@
+name: Security Scan
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+
+      - name: Audit dependencies
+        # Known baseline vulnerabilities are ignored below; new ones will fail this check.
+        # The mitmproxy 10.x advisories (GHSA-527g-3w9m-29hv, GHSA-63cx-g855-hvv4,
+        # GHSA-wg33-5h85-7q5p, PYSEC-2026-92) cannot be resolved without dropping
+        # Python < 3.12 support, as mitmproxy 12+ requires Python 3.12+.
+        run: |
+          uv --preview audit --frozen \
+            --ignore GHSA-2qfp-q593-8484 \
+            --ignore GHSA-79v4-65xg-pq4g \
+            --ignore GHSA-h4gh-qq45-vh27 \
+            --ignore GHSA-m959-cc7f-wv43 \
+            --ignore GHSA-r6ph-v2qm-q3c2 \
+            --ignore PYSEC-2026-35 \
+            --ignore GHSA-68rp-wp8r-4726 \
+            --ignore GHSA-vqfr-h8mv-ghfj \
+            --ignore GHSA-527g-3w9m-29hv \
+            --ignore GHSA-63cx-g855-hvv4 \
+            --ignore GHSA-wg33-5h85-7q5p \
+            --ignore PYSEC-2026-92 \
+            --ignore GHSA-5pwr-322w-8jr4 \
+            --ignore GHSA-vp96-hxj8-p424
