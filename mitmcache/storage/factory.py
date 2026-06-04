@@ -1,13 +1,8 @@
-"""Factory of Storage
+"""Factory for Storage initialization.
 
-There are many Storage classes, such as
-- SQLiteStorage
-- RedisStorage
-- FileStorage
-- etc.
-
-StorageFactory knows how to initialize them.
-So, the user of Storage does not need to know how to initialize them.
+Currently only SQLiteStorage is supported.
+StorageFactory initializes it from mitmproxy options, so callers do not
+need to know the constructor details.
 """
 
 from __future__ import annotations
