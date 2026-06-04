@@ -38,7 +38,11 @@ class Cache:
 
     def configure(self, updated: set[str]) -> None:
         existing = getattr(self, "storage", None)
-        if existing is not None and "cache_file" not in updated:
+        if (
+            existing is not None
+            and "cache_file" not in updated
+            and "cache_max_entries" not in updated
+        ):
             return
         if existing is not None:
             existing.close()
