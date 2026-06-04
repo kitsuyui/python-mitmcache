@@ -1,37 +1,45 @@
 from __future__ import annotations
 
 import io
+import logging
 import sqlite3
 
 import mitmproxy.io as mio
 from mitmproxy import http
+
+logger = logging.getLogger(__name__)
 
 
 class SQLiteStorage:
     def __init__(self, db_path: str) -> None:
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
-        cursor = self.conn.cursor()
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cache (
-                id INTEGER PRIMARY KEY,
-                cache_key TEXT UNIQUE,
-                url TEXT,
-                method TEXT,
-                flow BLOB
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS cache (
+                    id INTEGER PRIMARY KEY,
+                    cache_key TEXT UNIQUE,
+                    url TEXT,
+                    method TEXT,
+                    flow BLOB
+                )
+                """
             )
-            """
-        )
-        self.conn.commit()
+            self.conn.commit()
+        except Exception:
+            self.conn.close()
+            raise
 
     def get(self, cache_key: str) -> http.HTTPFlow | None:
         cursor = self.conn.cursor()
         cursor.execute("SELECT * FROM cache WHERE cache_key=?", (cache_key,))
         row = cursor.fetchone()
         if row:
-            for flow in mio.FlowReader(io.BytesIO(row["flow"])).stream():
-                return flow  # type: ignore
+            with io.BytesIO(row["flow"]) as buf:
+                for flow in mio.FlowReader(buf).stream():
+                    return flow  # type: ignore
 
         return None
 
@@ -81,6 +89,8 @@ class SQLiteStorage:
                 cache_key,
             ),
         )
+        if cursor.rowcount == 0:
+            logger.warning("update() noop: cache_key %r not found", cache_key)
         self.conn.commit()
 
     def purge(self, cache_key: str) -> None:

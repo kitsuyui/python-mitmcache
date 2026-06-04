@@ -47,10 +47,19 @@ $ curl --cacert /tmp/mitm.pem -H 'mitm-cache-key: 1234' -x 127.0.0.1:8080 https:
 
 ## Cache storage
 
-The cache is stored in a SQLite3 database (cache.db).
+The cache is stored in a SQLite3 database.
 
-By default, cache.db is created in the same directory as mitmcache.py.
-This behavior may change in the future.
+By default the `cache_file` option is `:memory:`, so the cache lives only
+for the duration of the proxy process and is discarded on exit. To persist
+the cache across restarts, pass `--set cache_file=cache.db` when starting
+mitmproxy:
+
+```sh
+$ mitmdump -s inject.py --set cache_file=cache.db
+```
+
+`uv run poe proxy` already passes `--set cache_file=cache.db` so it
+creates a `cache.db` file in the current directory automatically.
 
 # License
 

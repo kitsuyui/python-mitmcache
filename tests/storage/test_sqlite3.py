@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from mitmcache.storage.sqlite3 import SQLiteStorage
 
 from ..example_flow import example_flow
@@ -18,6 +22,19 @@ def test_cache_storage() -> None:
     storage.purge("test")
     assert storage.get("test") is None
     storage.close()
+
+
+def test_sqlite_storage_closes_connection_on_init_failure() -> None:
+    mock_conn = MagicMock()
+    mock_conn.cursor.return_value.execute.side_effect = Exception(
+        "init failure"
+    )
+    with patch(
+        "mitmcache.storage.sqlite3.sqlite3.connect", return_value=mock_conn
+    ):
+        with pytest.raises(Exception, match="init failure"):
+            SQLiteStorage(":memory:")
+    mock_conn.close.assert_called_once()
 
 
 def test_cache_storage_keeps_request_metadata_order() -> None:
