@@ -2,39 +2,46 @@ from __future__ import annotations
 
 import importlib.metadata
 import io
+import logging
 import sqlite3
 
 import mitmproxy.io as mio
 from mitmproxy import http
 
 _MITMPROXY_VERSION = importlib.metadata.version("mitmproxy")
+logger = logging.getLogger(__name__)
 
 
 class SQLiteStorage:
     def __init__(self, db_path: str) -> None:
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
-        cursor = self.conn.cursor()
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cache (
-                id INTEGER PRIMARY KEY,
-                cache_key TEXT UNIQUE,
-                url TEXT,
-                method TEXT,
-                flow BLOB,
-                flow_format_version TEXT
-            )
-            """
-        )
-        # Migrate existing databases that lack the flow_format_version column.
         try:
+            cursor = self.conn.cursor()
             cursor.execute(
-                "ALTER TABLE cache ADD COLUMN flow_format_version TEXT"
+                """
+                CREATE TABLE IF NOT EXISTS cache (
+                    id INTEGER PRIMARY KEY,
+                    cache_key TEXT UNIQUE,
+                    url TEXT,
+                    method TEXT,
+                    flow BLOB,
+                    flow_format_version TEXT
+                )
+                """
             )
-        except sqlite3.OperationalError:
-            pass  # column already exists
-        self.conn.commit()
+            # Migrate existing databases that lack the
+            # flow_format_version column.
+            try:
+                cursor.execute(
+                    "ALTER TABLE cache ADD COLUMN flow_format_version TEXT"
+                )
+            except sqlite3.OperationalError:
+                pass  # column already exists
+            self.conn.commit()
+        except Exception:
+            self.conn.close()
+            raise
 
     def get(self, cache_key: str) -> http.HTTPFlow | None:
         cursor = self.conn.cursor()
@@ -47,10 +54,11 @@ class SQLiteStorage:
             if stored_version != _MITMPROXY_VERSION:
                 return None
             try:
-                return next(  # type: ignore[return-value]
-                    iter(mio.FlowReader(io.BytesIO(row["flow"])).stream()),
-                    None,
-                )
+                with io.BytesIO(row["flow"]) as buf:
+                    return next(  # type: ignore[return-value]
+                        iter(mio.FlowReader(buf).stream()),
+                        None,
+                    )
             except Exception:
                 return None
 
@@ -106,6 +114,8 @@ class SQLiteStorage:
                 cache_key,
             ),
         )
+        if cursor.rowcount == 0:
+            logger.warning("update() noop: cache_key %r not found", cache_key)
         self.conn.commit()
 
     def purge(self, cache_key: str) -> None:
