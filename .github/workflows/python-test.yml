@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -19,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python: ["3.12", "3.13", "3.14"]
 
     steps:
       - name: Checkout
@@ -33,6 +37,8 @@ jobs:
 
       - name: Set up uv
         uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: true
 
       - name: Install dependencies
         run: |
@@ -41,6 +47,9 @@ jobs:
 
       - name: Lint
         run: uv run poe check
+
+      - name: Type check
+        run: uv run poe typecheck
 
       - name: Check Python version
         run: |
