@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 def _now() -> str:
-    return datetime.now(tz=timezone.utc).isoformat()
+    # mypy.ini pins python_version=3.10 where datetime.UTC is unavailable,
+    # so keep timezone.utc and silence ruff's UP017 modernization here.
+    return datetime.now(tz=timezone.utc).isoformat()  # noqa: UP017
 
 
 class SQLiteStorage:
