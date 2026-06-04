@@ -93,6 +93,12 @@ args = [
     { name = "target", default = "mitmcache tests", multiple = true, positional = true },
 ]
 
+[tool.poe.tasks.typecheck]
+cmd = "mypy ${target}"
+args = [
+    { name = "target", default = "mitmcache", multiple = true, positional = true },
+]
+
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore:'crypt' is deprecated and slated for removal in Python 3.13",
