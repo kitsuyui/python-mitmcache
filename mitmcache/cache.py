@@ -110,7 +110,7 @@ class Cache:
 
     def get_cache_key_from_flow(self, flow: HTTPFlow) -> str | None:
         for candidate in self.cache_key_candidates(flow):
-            if candidate:
+            if candidate is not None:
                 return str(candidate)
         return None
 
