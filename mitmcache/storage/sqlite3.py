@@ -11,19 +11,23 @@ class SQLiteStorage:
     def __init__(self, db_path: str) -> None:
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
-        cursor = self.conn.cursor()
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cache (
-                id INTEGER PRIMARY KEY,
-                cache_key TEXT UNIQUE,
-                url TEXT,
-                method TEXT,
-                flow BLOB
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS cache (
+                    id INTEGER PRIMARY KEY,
+                    cache_key TEXT UNIQUE,
+                    url TEXT,
+                    method TEXT,
+                    flow BLOB
+                )
+                """
             )
-            """
-        )
-        self.conn.commit()
+            self.conn.commit()
+        except Exception:
+            self.conn.close()
+            raise
 
     def get(self, cache_key: str) -> http.HTTPFlow | None:
         cursor = self.conn.cursor()
