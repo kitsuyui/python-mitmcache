@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.metadata
 import io
 import logging
 import sqlite3
@@ -8,6 +9,7 @@ from datetime import datetime, timezone
 import mitmproxy.io as mio
 from mitmproxy import http
 
+_MITMPROXY_VERSION = importlib.metadata.version("mitmproxy")
 logger = logging.getLogger(__name__)
 
 
@@ -32,10 +34,19 @@ class SQLiteStorage:
                     url TEXT,
                     method TEXT,
                     flow BLOB,
+                    flow_format_version TEXT,
                     last_accessed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
+            # Migrate existing databases that lack the
+            # flow_format_version column.
+            try:
+                cursor.execute(
+                    "ALTER TABLE cache ADD COLUMN flow_format_version TEXT"
+                )
+            except sqlite3.OperationalError:
+                pass  # column already exists
             self.conn.commit()
             # Migrate existing databases that predate last_accessed_at.
             try:
@@ -55,14 +66,24 @@ class SQLiteStorage:
         cursor.execute("SELECT * FROM cache WHERE cache_key=?", (cache_key,))
         row = cursor.fetchone()
         if row:
+            stored_version = row["flow_format_version"]
+            # Skip entries whose BLOB was written by a different mitmproxy
+            # version; deserialization may silently fail or raise.
+            if stored_version != _MITMPROXY_VERSION:
+                return None
             cursor.execute(
                 "UPDATE cache SET last_accessed_at = ? WHERE cache_key = ?",
                 (_now(), cache_key),
             )
             self.conn.commit()
-            with io.BytesIO(row["flow"]) as buf:
-                for flow in mio.FlowReader(buf).stream():
-                    return flow  # type: ignore
+            try:
+                with io.BytesIO(row["flow"]) as buf:
+                    return next(  # type: ignore[return-value]
+                        iter(mio.FlowReader(buf).stream()),
+                        None,
+                    )
+            except Exception:
+                return None
 
         return None
 
@@ -78,9 +99,10 @@ class SQLiteStorage:
                   , url
                   , method
                   , flow
+                  , flow_format_version
                   , last_accessed_at
                   )
-             VALUES (?, ?, ?, ?, ?)"""
+             VALUES (?, ?, ?, ?, ?, ?)"""
         cursor.execute(
             sql,
             (
@@ -88,6 +110,7 @@ class SQLiteStorage:
                 request.url,
                 request.method,
                 f.getvalue(),
+                _MITMPROXY_VERSION,
                 _now(),
             ),
         )
@@ -106,6 +129,7 @@ class SQLiteStorage:
            SET url = ?
              , method = ?
              , flow = ?
+             , flow_format_version = ?
              , last_accessed_at = ?
          WHERE cache_key = ?"""
         cursor.execute(
@@ -114,12 +138,44 @@ class SQLiteStorage:
                 request.url,
                 request.method,
                 f.getvalue(),
+                _MITMPROXY_VERSION,
                 _now(),
                 cache_key,
             ),
         )
         if cursor.rowcount == 0:
             logger.warning("update() noop: cache_key %r not found", cache_key)
+        if self.max_entries is not None:
+            self._evict()
+        self.conn.commit()
+
+    def upsert(self, cache_key: str, flow: http.HTTPFlow) -> None:
+        request = flow.request
+        cursor = self.conn.cursor()
+        f = io.BytesIO()
+        w = mio.FlowWriter(f)
+        w.add(flow)
+        sql = """\
+        INSERT OR REPLACE INTO cache
+                  ( cache_key
+                  , url
+                  , method
+                  , flow
+                  , flow_format_version
+                  , last_accessed_at
+                  )
+             VALUES (?, ?, ?, ?, ?, ?)"""
+        cursor.execute(
+            sql,
+            (
+                cache_key,
+                request.url,
+                request.method,
+                f.getvalue(),
+                _MITMPROXY_VERSION,
+                _now(),
+            ),
+        )
         if self.max_entries is not None:
             self._evict()
         self.conn.commit()
