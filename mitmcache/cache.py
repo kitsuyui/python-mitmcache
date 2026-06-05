@@ -87,7 +87,6 @@ class Cache:
                 assert cache.response is not None
                 logger.info(f"Cache hit: {_sanitize_for_log(cache_key)}")
                 flow.response = cache.response
-                flow.response.headers[self.cache_key] = cache_key
                 flow.metadata[self.cache_key] = cache_key
                 cache_from_origin = False
         else:
@@ -107,6 +106,10 @@ class Cache:
         if getattr(self, "_closed", False):
             logger.warning("Cache.response() called after done(); skipping.")
             return
+
+        # Strip internal header so it never reaches the downstream client.
+        flow.response.headers.pop(self.cache_key, None)
+
         # Check if the response has a cache key
         cache_key = self.get_cache_key_from_flow(flow)
         if flow.metadata.get(self.cache_from_origin, False) and cache_key:
