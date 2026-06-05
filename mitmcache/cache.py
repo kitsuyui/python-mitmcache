@@ -44,9 +44,9 @@ class Cache:
             and "cache_max_entries" not in updated
         ):
             return
+        self.storage = self.storage_factory.create()
         if existing is not None:
             existing.close()
-        self.storage = self.storage_factory.create()
         self._closed = False
 
     @property
