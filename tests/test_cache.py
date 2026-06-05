@@ -3,7 +3,7 @@ from __future__ import annotations
 from mitmproxy.addons import script
 from mitmproxy.test import taddons, tflow, tutils
 
-from mitmcache.cache import _sanitize_for_log
+from mitmcache.cache import Cache, _sanitize_for_log
 from mitmcache.storage.cache_storage import CacheStorage
 
 from .example_flow import example_flow
@@ -36,6 +36,17 @@ class TrackingStorage:
 
     def close(self):
         self.storage.close()
+
+
+def test_done_before_configure_no_error() -> None:
+    """done() must not raise AttributeError when called before configure().
+
+    mitmproxy may call done() on early teardown before configure() ever runs.
+    Without a guard, self.storage is unset and the unconditional
+    self.storage.close() raises AttributeError.
+    """
+    addon = Cache()
+    addon.done()  # must not raise
 
 
 def test_load_addon() -> None:

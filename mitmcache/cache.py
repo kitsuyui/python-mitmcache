@@ -131,7 +131,9 @@ class Cache:
         return candidates
 
     def done(self) -> None:
-        self.storage.close()
+        storage = getattr(self, "storage", None)
+        if storage is not None:
+            storage.close()
         self._closed = True
 
 
