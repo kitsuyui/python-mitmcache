@@ -44,9 +44,9 @@ class Cache:
             and "cache_max_entries" not in updated
         ):
             return
+        self.storage = self.storage_factory.create()
         if existing is not None:
             existing.close()
-        self.storage = self.storage_factory.create()
         self._closed = False
 
     @property
@@ -101,16 +101,15 @@ class Cache:
         if getattr(self, "_closed", False):
             logger.warning("Cache.response() called after done(); skipping.")
             return
+
+        # Strip internal header so it never reaches the downstream client.
+        flow.response.headers.pop(self.cache_key, None)
+
         # Check if the response has a cache key
         cache_key = self.get_cache_key_from_flow(flow)
         if flow.metadata.get(self.cache_from_origin, False) and cache_key:
-            cache = self.storage.get(cache_key)
-            if cache is not None:
-                self.storage.update(cache_key, flow)
-                logger.info(f"Cache updated: {_sanitize_for_log(cache_key)}")
-            else:
-                self.storage.store(cache_key, flow)
-                logger.info(f"Cache stored: {_sanitize_for_log(cache_key)}")
+            self.storage.upsert(cache_key, flow)
+            logger.info(f"Cache stored: {_sanitize_for_log(cache_key)}")
 
     def _set_cached_response(self, flow: HTTPFlow, cache_key: str) -> bool:
         cache = self.storage.get(cache_key)
@@ -126,7 +125,6 @@ class Cache:
 
         logger.info(f"Cache hit: {_sanitize_for_log(cache_key)}")
         flow.response = cache.response
-        flow.response.headers[self.cache_key] = cache_key
         flow.metadata[self.cache_key] = cache_key
         return True
 
@@ -148,7 +146,9 @@ class Cache:
         return candidates
 
     def done(self) -> None:
-        self.storage.close()
+        storage = getattr(self, "storage", None)
+        if storage is not None:
+            storage.close()
         self._closed = True
 
 
