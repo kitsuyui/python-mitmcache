@@ -4,6 +4,7 @@ import importlib.metadata
 import io
 import logging
 import sqlite3
+from datetime import datetime, timezone
 
 import mitmproxy.io as mio
 from mitmproxy import http
@@ -12,8 +13,15 @@ _MITMPROXY_VERSION = importlib.metadata.version("mitmproxy")
 logger = logging.getLogger(__name__)
 
 
+def _now() -> str:
+    # mypy.ini pins python_version=3.10 where datetime.UTC is unavailable,
+    # so keep timezone.utc and silence ruff's UP017 modernization here.
+    return datetime.now(tz=timezone.utc).isoformat()  # noqa: UP017
+
+
 class SQLiteStorage:
-    def __init__(self, db_path: str) -> None:
+    def __init__(self, db_path: str, max_entries: int | None = None) -> None:
+        self.max_entries = max_entries
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
         try:
@@ -26,7 +34,8 @@ class SQLiteStorage:
                     url TEXT,
                     method TEXT,
                     flow BLOB,
-                    flow_format_version TEXT
+                    flow_format_version TEXT,
+                    last_accessed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
@@ -39,6 +48,15 @@ class SQLiteStorage:
             except sqlite3.OperationalError:
                 pass  # column already exists
             self.conn.commit()
+            # Migrate existing databases that predate last_accessed_at.
+            try:
+                cursor.execute(
+                    "ALTER TABLE cache ADD COLUMN "
+                    "last_accessed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                )
+                self.conn.commit()
+            except sqlite3.OperationalError:
+                pass  # column already exists
         except Exception:
             self.conn.close()
             raise
@@ -53,6 +71,11 @@ class SQLiteStorage:
             # version; deserialization may silently fail or raise.
             if stored_version != _MITMPROXY_VERSION:
                 return None
+            cursor.execute(
+                "UPDATE cache SET last_accessed_at = ? WHERE cache_key = ?",
+                (_now(), cache_key),
+            )
+            self.conn.commit()
             try:
                 with io.BytesIO(row["flow"]) as buf:
                     return next(  # type: ignore[return-value]
@@ -77,8 +100,9 @@ class SQLiteStorage:
                   , method
                   , flow
                   , flow_format_version
+                  , last_accessed_at
                   )
-             VALUES (?, ?, ?, ?, ?)"""
+             VALUES (?, ?, ?, ?, ?, ?)"""
         cursor.execute(
             sql,
             (
@@ -87,8 +111,11 @@ class SQLiteStorage:
                 request.method,
                 f.getvalue(),
                 _MITMPROXY_VERSION,
+                _now(),
             ),
         )
+        if self.max_entries is not None:
+            self._evict()
         self.conn.commit()
 
     def update(self, cache_key: str, flow: http.HTTPFlow) -> None:
@@ -103,6 +130,7 @@ class SQLiteStorage:
              , method = ?
              , flow = ?
              , flow_format_version = ?
+             , last_accessed_at = ?
          WHERE cache_key = ?"""
         cursor.execute(
             sql,
@@ -111,11 +139,14 @@ class SQLiteStorage:
                 request.method,
                 f.getvalue(),
                 _MITMPROXY_VERSION,
+                _now(),
                 cache_key,
             ),
         )
         if cursor.rowcount == 0:
             logger.warning("update() noop: cache_key %r not found", cache_key)
+        if self.max_entries is not None:
+            self._evict()
         self.conn.commit()
 
     def upsert(self, cache_key: str, flow: http.HTTPFlow) -> None:
@@ -130,8 +161,10 @@ class SQLiteStorage:
                   , url
                   , method
                   , flow
+                  , flow_format_version
+                  , last_accessed_at
                   )
-             VALUES (?, ?, ?, ?)"""
+             VALUES (?, ?, ?, ?, ?, ?)"""
         cursor.execute(
             sql,
             (
@@ -139,9 +172,25 @@ class SQLiteStorage:
                 request.url,
                 request.method,
                 f.getvalue(),
+                _MITMPROXY_VERSION,
+                _now(),
             ),
         )
+        if self.max_entries is not None:
+            self._evict()
         self.conn.commit()
+
+    def _evict(self) -> None:
+        if self.max_entries is None:
+            return
+        cursor = self.conn.cursor()
+        # Keep the max_entries most-recently-accessed entries; evict the rest.
+        # Secondary sort by id DESC breaks ties deterministically (newer insert wins).
+        cursor.execute(
+            "DELETE FROM cache WHERE id NOT IN "
+            "(SELECT id FROM cache ORDER BY last_accessed_at DESC, id DESC LIMIT ?)",
+            (self.max_entries,),
+        )
 
     def purge(self, cache_key: str) -> None:
         cursor = self.conn.cursor()
