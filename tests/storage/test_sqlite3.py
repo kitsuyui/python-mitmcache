@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.metadata
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -63,3 +64,88 @@ def test_cache_storage_keeps_request_metadata_order() -> None:
     assert row["url"] == flow.request.url
     assert row["method"] == flow.request.method
     storage.close()
+
+
+def test_cache_storage_records_flow_format_version() -> None:
+    """Confirm that flow_format_version is stored with each entry."""
+    storage = SQLiteStorage(":memory:")
+    flow = example_flow()
+    storage.store("test", flow)
+
+    row = storage.conn.execute(
+        "SELECT flow_format_version FROM cache WHERE cache_key=?",
+        ("test",),
+    ).fetchone()
+    assert row is not None
+    assert row["flow_format_version"] == importlib.metadata.version(
+        "mitmproxy"
+    )
+    storage.close()
+
+
+def test_cache_storage_version_mismatch_returns_none() -> None:
+    """Confirm that a version-mismatched entry is treated as a cache miss."""
+    storage = SQLiteStorage(":memory:")
+    flow = example_flow()
+    storage.store("test", flow)
+
+    # Simulate a BLOB written by a different mitmproxy version.
+    storage.conn.execute(
+        "UPDATE cache SET flow_format_version=? WHERE cache_key=?",
+        ("0.0.0", "test"),
+    )
+    storage.conn.commit()
+
+    assert storage.get("test") is None
+    storage.close()
+
+
+def test_cache_storage_corrupt_blob_returns_none() -> None:
+    """Confirm that a corrupt BLOB does not crash get() and returns None."""
+    storage = SQLiteStorage(":memory:")
+    flow = example_flow()
+    storage.store("test", flow)
+
+    storage.conn.execute(
+        "UPDATE cache SET flow=? WHERE cache_key=?",
+        (b"not-a-valid-flow-blob", "test"),
+    )
+    storage.conn.commit()
+
+    assert storage.get("test") is None
+    storage.close()
+
+
+def test_cache_storage_migrates_existing_db() -> None:
+    """Confirm that existing DBs without the version column are migrated."""
+    import sqlite3 as _sqlite3
+
+    conn = _sqlite3.connect(":memory:")
+    conn.row_factory = _sqlite3.Row
+    # Create old-style schema without flow_format_version.
+    conn.execute(
+        """
+        CREATE TABLE cache (
+            id INTEGER PRIMARY KEY,
+            cache_key TEXT UNIQUE,
+            url TEXT,
+            method TEXT,
+            flow BLOB
+        )
+        """
+    )
+    conn.commit()
+
+    # SQLiteStorage.__init__ should add the missing column.
+    storage = SQLiteStorage.__new__(SQLiteStorage)
+    storage.conn = conn
+    cursor = conn.cursor()
+    try:
+        cursor.execute("ALTER TABLE cache ADD COLUMN flow_format_version TEXT")
+    except _sqlite3.OperationalError:
+        pass
+    conn.commit()
+
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(cache)").fetchall()]
+    assert "flow_format_version" in cols
+    conn.close()

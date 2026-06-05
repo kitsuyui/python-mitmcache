@@ -12,7 +12,20 @@ This is useful for web service development, testing, debugging and web scraping.
 
 ### Installation
 
-Work in progress.
+mitmcache is intended to be run from this source repository and is not
+currently published to PyPI.
+
+Install the runtime and development dependencies with
+[uv](https://docs.astral.sh/uv/):
+
+```sh
+$ git clone https://github.com/kitsuyui/python-mitmcache.git
+$ cd python-mitmcache
+$ uv sync
+```
+
+The project requires Python 3.12 or newer. After `uv sync`, run the
+commands below with `uv run poe ...` from the repository root.
 
 ### Download certificate
 

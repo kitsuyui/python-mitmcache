@@ -3,7 +3,7 @@ from __future__ import annotations
 from mitmproxy.addons import script
 from mitmproxy.test import taddons, tflow, tutils
 
-from mitmcache.cache import _sanitize_for_log
+from mitmcache.cache import Cache, _sanitize_for_log
 from mitmcache.storage.cache_storage import CacheStorage
 
 from .example_flow import example_flow
@@ -14,6 +14,7 @@ class TrackingStorage:
         self.storage = storage
         self.store_count = 0
         self.update_count = 0
+        self.upsert_count = 0
 
     def get(self, cache_key):
         return self.storage.get(cache_key)
@@ -25,6 +26,10 @@ class TrackingStorage:
     def update(self, cache_key, flow):
         self.update_count += 1
         self.storage.update(cache_key, flow)
+
+    def upsert(self, cache_key, flow):
+        self.upsert_count += 1
+        self.storage.upsert(cache_key, flow)
 
     def purge(self, cache_key):
         self.storage.purge(cache_key)
@@ -45,11 +50,25 @@ class FailingStorage:
     def update(self, cache_key, flow):
         raise OSError("simulated storage failure")
 
+    def upsert(self, cache_key, flow):
+        raise OSError("simulated storage failure")
+
     def purge(self, cache_key):
         raise OSError("simulated storage failure")
 
     def close(self):
         pass
+
+
+def test_done_before_configure_no_error() -> None:
+    """done() must not raise AttributeError when called before configure().
+
+    mitmproxy may call done() on early teardown before configure() ever runs.
+    Without a guard, self.storage is unset and the unconditional
+    self.storage.close() raises AttributeError.
+    """
+    addon = Cache()
+    addon.done()  # must not raise
 
 
 def test_load_addon() -> None:
@@ -101,8 +120,7 @@ def test_cache_hit() -> None:
         # cache miss but the response is stored
         addon.request(flow)
         addon.response(flow)
-        assert storage.store_count == 1
-        assert storage.update_count == 0
+        assert storage.upsert_count == 1
 
         flow = tflow.tflow(
             req=tutils.treq(
@@ -120,8 +138,7 @@ def test_cache_hit() -> None:
         assert flow.response.text == "Hello, World!"
         assert flow.metadata[addon.cache_from_origin] is False
         addon.response(flow)
-        assert storage.store_count == 1
-        assert storage.update_count == 0
+        assert storage.upsert_count == 1
         addon.done()
 
 
@@ -234,6 +251,52 @@ def test_request_and_response_after_done_are_no_ops() -> None:
         # configure() reopens storage and clears the closed flag.
         addon.configure({"cache_file"})
         assert addon._closed is False
+
+
+def test_cache_key_header_not_leaked_to_client() -> None:
+    """Internal cache key header must not appear in the response seen by clients.
+
+    On a cache hit, the addon must not expose the proxy-internal
+    header to downstream consumers.
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+
+        # First request: populate the cache.
+        flow_store = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"leak-test-key")],
+            ),
+            resp=tutils.tresp(
+                content=b"Cached body",
+                status_code=200,
+            ),
+        )
+        addon.request(flow_store)
+        addon.response(flow_store)
+
+        # Second request: cache hit.
+        flow_hit = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"leak-test-key")],
+            ),
+            resp=False,
+        )
+        addon.request(flow_hit)
+        assert flow_hit.response is not None
+        addon.response(flow_hit)
+
+        # The internal header must not be present in the response forwarded to
+        # the client.
+        assert addon.cache_key not in flow_hit.response.headers
+
+        addon.done()
 
 
 def test_get_cache_key_from_flow() -> None:

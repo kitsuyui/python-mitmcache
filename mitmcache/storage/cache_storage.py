@@ -18,5 +18,8 @@ class CacheStorage(Protocol):
     def update(self, cache_key: str, flow: http.HTTPFlow) -> None:
         """Update flow in cache with specified cache key."""
 
+    def upsert(self, cache_key: str, flow: http.HTTPFlow) -> None:
+        """Insert or replace flow in cache atomically."""
+
     def close(self) -> None:
         """Close cache storage."""
