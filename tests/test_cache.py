@@ -14,6 +14,7 @@ class TrackingStorage:
         self.storage = storage
         self.store_count = 0
         self.update_count = 0
+        self.upsert_count = 0
 
     def get(self, cache_key):
         return self.storage.get(cache_key)
@@ -25,6 +26,10 @@ class TrackingStorage:
     def update(self, cache_key, flow):
         self.update_count += 1
         self.storage.update(cache_key, flow)
+
+    def upsert(self, cache_key, flow):
+        self.upsert_count += 1
+        self.storage.upsert(cache_key, flow)
 
     def purge(self, cache_key):
         self.storage.purge(cache_key)
@@ -82,8 +87,7 @@ def test_cache_hit() -> None:
         # cache miss but the response is stored
         addon.request(flow)
         addon.response(flow)
-        assert storage.store_count == 1
-        assert storage.update_count == 0
+        assert storage.upsert_count == 1
 
         flow = tflow.tflow(
             req=tutils.treq(
@@ -101,8 +105,7 @@ def test_cache_hit() -> None:
         assert flow.response.text == "Hello, World!"
         assert flow.metadata[addon.cache_from_origin] is False
         addon.response(flow)
-        assert storage.store_count == 1
-        assert storage.update_count == 0
+        assert storage.upsert_count == 1
         addon.done()
 
 
