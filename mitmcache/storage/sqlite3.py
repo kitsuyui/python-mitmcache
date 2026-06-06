@@ -130,8 +130,9 @@ class SQLiteStorage:
                   , url
                   , method
                   , flow
+                  , flow_format_version
                   )
-             VALUES (?, ?, ?, ?)"""
+             VALUES (?, ?, ?, ?, ?)"""
         cursor.execute(
             sql,
             (
@@ -139,6 +140,7 @@ class SQLiteStorage:
                 request.url,
                 request.method,
                 f.getvalue(),
+                _MITMPROXY_VERSION,
             ),
         )
         self.conn.commit()
