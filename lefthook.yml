@@ -1,0 +1,13 @@
+# Clear Git hook environment variables before running checks so nested or sibling
+# repositories are not affected: https://git-scm.com/docs/githooks
+pre-commit:
+  jobs:
+    - name: check
+      run: for name in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do unset "$name"; done; uv run poe check
+
+pre-push:
+  jobs:
+    - name: check
+      run: for name in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do unset "$name"; done; uv run poe check
+    - name: test
+      run: for name in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do unset "$name"; done; uv run poe test
