@@ -101,6 +101,8 @@ def test_cache_hit() -> None:
         addon.request(flow)
         addon.response(flow)
         assert storage.upsert_count == 1
+        assert storage.store_count == 0
+        assert storage.update_count == 0
 
         flow = tflow.tflow(
             req=tutils.treq(
@@ -119,6 +121,8 @@ def test_cache_hit() -> None:
         assert flow.metadata[addon.cache_from_origin] is False
         addon.response(flow)
         assert storage.upsert_count == 1
+        assert storage.store_count == 0
+        assert storage.update_count == 0
         addon.done()
 
 
