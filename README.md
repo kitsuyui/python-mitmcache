@@ -74,6 +74,34 @@ $ mitmdump -s inject.py --set cache_file=cache.db
 `uv run poe proxy` already passes `--set cache_file=cache.db` so it
 creates a `cache.db` file in the current directory automatically.
 
+## Development
+
+This repository uses [lefthook](https://lefthook.dev/) to run the same checks as CI
+locally, so problems surface before they reach CI.
+
+```sh
+# Install dependencies
+uv sync
+
+# Install the Git hooks (once; requires lefthook on your PATH)
+lefthook install
+```
+
+Once installed, the hooks run automatically:
+
+- **pre-commit**: `uv run poe check`
+- **pre-push**: `uv run poe check` and `uv run poe test`
+
+You can also run the checks manually:
+
+```sh
+uv run poe check
+uv run poe test
+```
+
+CI still runs the full matrix (see `.github/workflows/`); the hooks only bring that
+feedback earlier on your machine.
+
 # License
 
 MIT License
