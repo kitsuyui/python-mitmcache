@@ -103,13 +103,21 @@ class Cache:
             return
 
         # Strip internal header so it never reaches the downstream client.
-        flow.response.headers.pop(self.cache_key, None)
+        if flow.response is not None:
+            flow.response.headers.pop(self.cache_key, None)
 
         # Check if the response has a cache key
         cache_key = self.get_cache_key_from_flow(flow)
         if flow.metadata.get(self.cache_from_origin, False) and cache_key:
-            self.storage.upsert(cache_key, flow)
-            logger.info(f"Cache stored: {_sanitize_for_log(cache_key)}")
+            self._store_response(cache_key, flow)
+
+    def _store_response(self, cache_key: str, flow: http.HTTPFlow) -> None:
+        # Do not cache error responses; a cached 4xx/5xx would be served
+        # indefinitely even after the origin recovers.
+        if flow.response is None or flow.response.status_code >= 400:
+            return
+        self.storage.upsert(cache_key, flow)
+        logger.info(f"Cache stored: {_sanitize_for_log(cache_key)}")
 
     def _set_cached_response(self, flow: HTTPFlow, cache_key: str) -> bool:
         cache = self.storage.get(cache_key)

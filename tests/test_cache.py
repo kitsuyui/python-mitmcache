@@ -275,6 +275,39 @@ def test_request_and_response_after_done_are_no_ops() -> None:
         assert addon._closed is False
 
 
+def test_error_response_not_cached() -> None:
+    """Error responses (4xx/5xx) must not be stored in the cache.
+
+    Caching an error response would cause the cache to serve the error
+    indefinitely even after the origin recovers.
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
+
+        for status_code in (400, 401, 403, 404, 500, 502, 503):
+            flow = tflow.tflow(
+                req=tutils.treq(
+                    method=b"GET",
+                    path=b"/",
+                    host=b"localhost:65535",
+                    headers=[(b"Mitm-Cache-Key", b"err-key")],
+                ),
+                resp=tutils.tresp(
+                    content=b"Error",
+                    status_code=status_code,
+                ),
+            )
+            addon.request(flow)
+            addon.response(flow)
+
+        assert storage.store_count == 0
+        assert storage.update_count == 0
+        assert storage.upsert_count == 0
+        addon.done()
+
+
 def test_cache_key_header_not_leaked_to_client() -> None:
     """Internal cache key header must not appear in the response seen by clients.
 
