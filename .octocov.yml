@@ -2,11 +2,13 @@
 coverage:
   paths:
     - coverage.xml
+  acceptable: current >= 90%
 codeToTestRatio:
   code:
     - "mitmcache/**/*.py"
   test:
     - "tests/**/*.py"
+  acceptable: current >= 1.0
 testExecutionTime:
   if: true
 diff:
