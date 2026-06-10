@@ -82,12 +82,7 @@ class Cache:
 
         # Get response from cache
         if search_cache and cache_key:
-            cache = self.storage.get(cache_key)
-            if cache is not None:
-                assert cache.response is not None
-                logger.info(f"Cache hit: {_sanitize_for_log(cache_key)}")
-                flow.response = cache.response
-                flow.metadata[self.cache_key] = cache_key
+            if self._set_cached_response(flow, cache_key):
                 cache_from_origin = False
         else:
             cache_key = generate_cache_key_by_uuid()
@@ -115,6 +110,23 @@ class Cache:
         if flow.metadata.get(self.cache_from_origin, False) and cache_key:
             self.storage.upsert(cache_key, flow)
             logger.info(f"Cache stored: {_sanitize_for_log(cache_key)}")
+
+    def _set_cached_response(self, flow: HTTPFlow, cache_key: str) -> bool:
+        cache = self.storage.get(cache_key)
+        if cache is None:
+            return False
+        if cache.response is None:
+            logger.warning(
+                "Ignoring cached flow without response: %s",
+                _sanitize_for_log(cache_key),
+            )
+            self.storage.purge(cache_key)
+            return False
+
+        logger.info(f"Cache hit: {_sanitize_for_log(cache_key)}")
+        flow.response = cache.response
+        flow.metadata[self.cache_key] = cache_key
+        return True
 
     def get_cache_key_from_flow(self, flow: HTTPFlow) -> str | None:
         for candidate in self.cache_key_candidates(flow):
