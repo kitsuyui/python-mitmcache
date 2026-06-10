@@ -15,6 +15,7 @@ class TrackingStorage:
         self.store_count = 0
         self.update_count = 0
         self.upsert_count = 0
+        self.purge_count = 0
 
     def get(self, cache_key):
         return self.storage.get(cache_key)
@@ -32,6 +33,7 @@ class TrackingStorage:
         self.storage.upsert(cache_key, flow)
 
     def purge(self, cache_key):
+        self.purge_count += 1
         self.storage.purge(cache_key)
 
     def close(self):
@@ -146,6 +148,44 @@ def test_cache_hit() -> None:
         addon.done()
 
 
+def test_cache_entry_without_response_is_ignored() -> None:
+    """Confirm that an incomplete cached flow does not short-circuit."""
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
+
+        cached_flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+            ),
+            resp=False,
+        )
+        storage.store("empty-response", cached_flow)
+        assert storage.store_count == 1
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"empty-response")],
+            ),
+            resp=False,
+        )
+
+        addon.request(flow)
+
+        assert flow.response is None
+        assert addon.cache_key not in flow.request.headers
+        assert flow.metadata[addon.cache_key] == "empty-response"
+        assert flow.metadata[addon.cache_from_origin] is True
+        assert storage.purge_count == 1
+        addon.done()
+
+
 def test_configure_closes_previous_storage() -> None:
     """Confirm that reconfiguring closes the previous storage."""
     with taddons.context() as tctx:
@@ -255,6 +295,39 @@ def test_request_and_response_after_done_are_no_ops() -> None:
         # configure() reopens storage and clears the closed flag.
         addon.configure({"cache_file"})
         assert addon._closed is False
+
+
+def test_error_response_not_cached() -> None:
+    """Error responses (4xx/5xx) must not be stored in the cache.
+
+    Caching an error response would cause the cache to serve the error
+    indefinitely even after the origin recovers.
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
+
+        for status_code in (400, 401, 403, 404, 500, 502, 503):
+            flow = tflow.tflow(
+                req=tutils.treq(
+                    method=b"GET",
+                    path=b"/",
+                    host=b"localhost:65535",
+                    headers=[(b"Mitm-Cache-Key", b"err-key")],
+                ),
+                resp=tutils.tresp(
+                    content=b"Error",
+                    status_code=status_code,
+                ),
+            )
+            addon.request(flow)
+            addon.response(flow)
+
+        assert storage.store_count == 0
+        assert storage.update_count == 0
+        assert storage.upsert_count == 0
+        addon.done()
 
 
 def test_cache_key_header_not_leaked_to_client() -> None:

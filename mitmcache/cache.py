@@ -82,12 +82,7 @@ class Cache:
 
         # Get response from cache
         if search_cache and cache_key:
-            cache = self._get_cached(cache_key)
-            if cache is not None:
-                assert cache.response is not None
-                logger.info(f"Cache hit: {_sanitize_for_log(cache_key)}")
-                flow.response = cache.response
-                flow.metadata[self.cache_key] = cache_key
+            if self._set_cached_response(flow, cache_key):
                 cache_from_origin = False
         else:
             cache_key = generate_cache_key_by_uuid()
@@ -108,26 +103,20 @@ class Cache:
             return
 
         # Strip internal header so it never reaches the downstream client.
-        flow.response.headers.pop(self.cache_key, None)
+        if flow.response is not None:
+            flow.response.headers.pop(self.cache_key, None)
 
         # Check if the response has a cache key
         cache_key = self.get_cache_key_from_flow(flow)
         if flow.metadata.get(self.cache_from_origin, False) and cache_key:
             self._store_response(cache_key, flow)
 
-    def _get_cached(self, cache_key: str) -> http.HTTPFlow | None:
-        """Best-effort cache read; storage failures bypass the cache."""
-        try:
-            return self.storage.get(cache_key)
-        except Exception:
-            logger.exception(
-                "Cache storage read failed for key %s; bypassing cache",
-                _sanitize_for_log(cache_key),
-            )
-            return None
-
     def _store_response(self, cache_key: str, flow: http.HTTPFlow) -> None:
         """Best-effort cache write; storage failures leave the flow uncached."""
+        # Do not cache error responses; a cached 4xx/5xx would be served
+        # indefinitely even after the origin recovers.
+        if flow.response is None or flow.response.status_code >= 400:
+            return
         try:
             self.storage.upsert(cache_key, flow)
             logger.info(f"Cache stored: {_sanitize_for_log(cache_key)}")
@@ -136,6 +125,31 @@ class Cache:
                 "Cache storage write failed for key %s; response not cached",
                 _sanitize_for_log(cache_key),
             )
+
+    def _set_cached_response(self, flow: HTTPFlow, cache_key: str) -> bool:
+        """Best-effort cache read; storage failures bypass the cache."""
+        try:
+            cache = self.storage.get(cache_key)
+        except Exception:
+            logger.exception(
+                "Cache storage read failed for key %s; bypassing cache",
+                _sanitize_for_log(cache_key),
+            )
+            return False
+        if cache is None:
+            return False
+        if cache.response is None:
+            logger.warning(
+                "Ignoring cached flow without response: %s",
+                _sanitize_for_log(cache_key),
+            )
+            self.storage.purge(cache_key)
+            return False
+
+        logger.info(f"Cache hit: {_sanitize_for_log(cache_key)}")
+        flow.response = cache.response
+        flow.metadata[self.cache_key] = cache_key
+        return True
 
     def get_cache_key_from_flow(self, flow: HTTPFlow) -> str | None:
         for candidate in self.cache_key_candidates(flow):
