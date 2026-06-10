@@ -8,7 +8,7 @@ codeToTestRatio:
     - "mitmcache/**/*.py"
   test:
     - "tests/**/*.py"
-  acceptable: ratio >= 1.0
+  acceptable: current >= 1.0
 testExecutionTime:
   if: true
 diff:
