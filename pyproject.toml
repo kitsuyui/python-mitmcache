@@ -41,6 +41,7 @@ package-dir = { "mitmcache" = "mitmcache" }
 write_to = "mitmcache/_version.py"
 version_scheme = "only-version"
 local_scheme = "no-local-version"
+fallback_version = "0.1.0"
 
 [build-system]
 requires = [
