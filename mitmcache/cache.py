@@ -112,15 +112,30 @@ class Cache:
             self._store_response(cache_key, flow)
 
     def _store_response(self, cache_key: str, flow: http.HTTPFlow) -> None:
+        """Best-effort cache write; storage failures leave the flow uncached."""
         # Do not cache error responses; a cached 4xx/5xx would be served
         # indefinitely even after the origin recovers.
         if flow.response is None or flow.response.status_code >= 400:
             return
-        self.storage.upsert(cache_key, flow)
-        logger.info(f"Cache stored: {_sanitize_for_log(cache_key)}")
+        try:
+            self.storage.upsert(cache_key, flow)
+            logger.info(f"Cache stored: {_sanitize_for_log(cache_key)}")
+        except Exception:
+            logger.exception(
+                "Cache storage write failed for key %s; response not cached",
+                _sanitize_for_log(cache_key),
+            )
 
     def _set_cached_response(self, flow: HTTPFlow, cache_key: str) -> bool:
-        cache = self.storage.get(cache_key)
+        """Best-effort cache read; storage failures bypass the cache."""
+        try:
+            cache = self.storage.get(cache_key)
+        except Exception:
+            logger.exception(
+                "Cache storage read failed for key %s; bypassing cache",
+                _sanitize_for_log(cache_key),
+            )
+            return False
         if cache is None:
             return False
         if cache.response is None:

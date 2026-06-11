@@ -40,6 +40,28 @@ class TrackingStorage:
         self.storage.close()
 
 
+class FailingStorage:
+    """Storage stub that always raises on read or write operations."""
+
+    def get(self, cache_key):
+        raise OSError("simulated storage failure")
+
+    def store(self, cache_key, flow):
+        raise OSError("simulated storage failure")
+
+    def update(self, cache_key, flow):
+        raise OSError("simulated storage failure")
+
+    def upsert(self, cache_key, flow):
+        raise OSError("simulated storage failure")
+
+    def purge(self, cache_key):
+        raise OSError("simulated storage failure")
+
+    def close(self):
+        pass
+
+
 def test_done_before_configure_no_error() -> None:
     """done() must not raise AttributeError when called before configure().
 
@@ -424,6 +446,53 @@ def test_get_cache_key_from_flow() -> None:
         assert addon.get_cache_key_from_flow(flow) == ""
 
         addon.done()
+
+
+def test_storage_exception_in_request_does_not_propagate() -> None:
+    """request() must not raise when the storage backend throws.
+
+    A storage failure (e.g. database locked, disk full) is best-effort:
+    the flow should continue and reach the origin rather than being aborted.
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        addon.storage = FailingStorage()
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"fail-key")],
+            ),
+            resp=False,
+        )
+        addon.request(flow)  # must not raise
+        assert flow.response is None  # flow continues to origin
+
+
+def test_storage_exception_in_response_does_not_propagate() -> None:
+    """response() must not raise when the storage backend throws.
+
+    A write failure during caching is best-effort: the flow completes
+    normally even though the response is not cached.
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        addon.storage = FailingStorage()
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"fail-key")],
+            ),
+            resp=tutils.tresp(content=b"Hello", status_code=200),
+        )
+        # Simulate that this response came from origin (cache_from_origin=True)
+        flow.metadata["Mitm-Cache-From-Origin"] = True
+        addon.response(flow)  # must not raise
 
 
 def test_sanitize_for_log() -> None:
