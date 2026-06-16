@@ -154,13 +154,13 @@ class Cache:
     def get_cache_key_from_flow(self, flow: HTTPFlow) -> str | None:
         for candidate in self.cache_key_candidates(flow):
             if candidate is not None:
-                return str(candidate)
+                return candidate
         return None
 
     def cache_key_candidates(
         self, flow: HTTPFlow
-    ) -> list[str | object | None]:
-        candidates: list[str | object | None] = [
+    ) -> list[str | None]:
+        candidates: list[str | None] = [
             flow.metadata.get(self.cache_key),
             flow.request.headers.get(self.cache_key),
         ]
