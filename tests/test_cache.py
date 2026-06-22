@@ -376,6 +376,34 @@ def test_cache_key_header_not_leaked_to_client() -> None:
         addon.done()
 
 
+def test_large_response_skipped_when_max_body_size_set() -> None:
+    """Responses exceeding cache_max_body_size must not be stored."""
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        tctx.configure(addon, cache_max_body_size=10)
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"big-key")],
+            ),
+            resp=tutils.tresp(
+                content=b"X" * 11,  # 11 bytes > limit of 10
+                status_code=200,
+            ),
+        )
+        addon.request(flow)
+        addon.response(flow)
+        assert storage.store_count == 0
+        assert storage.update_count == 0
+        assert storage.upsert_count == 0
+        addon.done()
+
+
 def test_get_cache_key_from_flow() -> None:
     """Confirm that the cache key is extracted from the flow."""
     with taddons.context() as tctx:
