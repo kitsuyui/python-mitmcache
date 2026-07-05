@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import get_protocol_members
+try:
+    from typing import get_protocol_members
+except ImportError:
+    from typing_extensions import get_protocol_members
 
 from mitmcache.storage.cache_storage import CacheStorage
 from mitmcache.storage.sqlite3 import SQLiteStorage
