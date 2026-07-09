@@ -15,6 +15,7 @@ class TrackingStorage:
         self.store_count = 0
         self.update_count = 0
         self.upsert_count = 0
+        self.purge_count = 0
 
     def get(self, cache_key):
         return self.storage.get(cache_key)
@@ -32,10 +33,33 @@ class TrackingStorage:
         self.storage.upsert(cache_key, flow)
 
     def purge(self, cache_key):
+        self.purge_count += 1
         self.storage.purge(cache_key)
 
     def close(self):
         self.storage.close()
+
+
+class FailingStorage:
+    """Storage stub that always raises on read or write operations."""
+
+    def get(self, cache_key):
+        raise OSError("simulated storage failure")
+
+    def store(self, cache_key, flow):
+        raise OSError("simulated storage failure")
+
+    def update(self, cache_key, flow):
+        raise OSError("simulated storage failure")
+
+    def upsert(self, cache_key, flow):
+        raise OSError("simulated storage failure")
+
+    def purge(self, cache_key):
+        raise OSError("simulated storage failure")
+
+    def close(self):
+        pass
 
 
 def test_done_before_configure_no_error() -> None:
@@ -99,6 +123,8 @@ def test_cache_hit() -> None:
         addon.request(flow)
         addon.response(flow)
         assert storage.upsert_count == 1
+        assert storage.store_count == 0
+        assert storage.update_count == 0
 
         flow = tflow.tflow(
             req=tutils.treq(
@@ -117,6 +143,46 @@ def test_cache_hit() -> None:
         assert flow.metadata[addon.cache_from_origin] is False
         addon.response(flow)
         assert storage.upsert_count == 1
+        assert storage.store_count == 0
+        assert storage.update_count == 0
+        addon.done()
+
+
+def test_cache_entry_without_response_is_ignored() -> None:
+    """Confirm that an incomplete cached flow does not short-circuit."""
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
+
+        cached_flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+            ),
+            resp=False,
+        )
+        storage.store("empty-response", cached_flow)
+        assert storage.store_count == 1
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"empty-response")],
+            ),
+            resp=False,
+        )
+
+        addon.request(flow)
+
+        assert flow.response is None
+        assert addon.cache_key not in flow.request.headers
+        assert flow.metadata[addon.cache_key] == "empty-response"
+        assert flow.metadata[addon.cache_from_origin] is True
+        assert storage.purge_count == 1
         addon.done()
 
 
@@ -181,8 +247,7 @@ def test_cache_key_header_stripped_before_origin() -> None:
         assert addon.cache_key not in flow_miss.request.headers
         assert flow_miss.metadata[addon.cache_key] == "miss-key"
 
-        # case2. no cache key -> auto-uuid path, header should be absent
-        # before forwarding to origin.
+        # case2. no cache key -> forwarded to origin without caching.
         flow_nokey = tflow.tflow(
             req=tutils.treq(
                 method=b"GET",
@@ -193,6 +258,7 @@ def test_cache_key_header_stripped_before_origin() -> None:
         )
         addon.request(flow_nokey)
         assert addon.cache_key not in flow_nokey.request.headers
+        assert flow_nokey.metadata[addon.cache_key] is None
 
         addon.done()
 
@@ -229,6 +295,38 @@ def test_request_and_response_after_done_are_no_ops() -> None:
         # configure() reopens storage and clears the closed flag.
         addon.configure({"cache_file"})
         assert addon._closed is False
+
+def test_error_response_not_cached() -> None:
+    """Error responses (4xx/5xx) must not be stored in the cache.
+
+    Caching an error response would cause the cache to serve the error
+    indefinitely even after the origin recovers.
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
+
+        for status_code in (400, 401, 403, 404, 500, 502, 503):
+            flow = tflow.tflow(
+                req=tutils.treq(
+                    method=b"GET",
+                    path=b"/",
+                    host=b"localhost:65535",
+                    headers=[(b"Mitm-Cache-Key", b"err-key")],
+                ),
+                resp=tutils.tresp(
+                    content=b"Error",
+                    status_code=status_code,
+                ),
+            )
+            addon.request(flow)
+            addon.response(flow)
+
+        assert storage.store_count == 0
+        assert storage.update_count == 0
+        assert storage.upsert_count == 0
+        addon.done()
 
 
 def test_cache_key_header_not_leaked_to_client() -> None:
@@ -274,6 +372,63 @@ def test_cache_key_header_not_leaked_to_client() -> None:
         # the client.
         assert addon.cache_key not in flow_hit.response.headers
 
+        addon.done()
+
+
+def test_large_response_skipped_when_max_body_size_set() -> None:
+    """Responses exceeding cache_max_body_size must not be stored."""
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        tctx.configure(addon, cache_max_body_size=10)
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"big-key")],
+            ),
+            resp=tutils.tresp(
+                content=b"X" * 11,  # 11 bytes > limit of 10
+                status_code=200,
+            ),
+        )
+        addon.request(flow)
+        addon.response(flow)
+        assert storage.store_count == 0
+        assert storage.update_count == 0
+        assert storage.upsert_count == 0
+        addon.done()
+
+
+def test_keyless_request_not_cached() -> None:
+    """Requests without a cache key must not be stored in the cache.
+
+    Previously a random UUID was assigned per request, causing unbounded
+    cache growth with entries that can never be reused. The fix removes
+    the UUID fallback entirely so keyless requests pass through to origin
+    without writing to storage.
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+            ),
+            resp=tutils.tresp(content=b"Hello"),
+        )
+        addon.request(flow)
+        addon.response(flow)
+
+        assert storage.store_count == 0
+        assert storage.update_count == 0
         addon.done()
 
 
@@ -347,6 +502,53 @@ def test_get_cache_key_from_flow() -> None:
         assert addon.get_cache_key_from_flow(flow) == ""
 
         addon.done()
+
+
+def test_storage_exception_in_request_does_not_propagate() -> None:
+    """request() must not raise when the storage backend throws.
+
+    A storage failure (e.g. database locked, disk full) is best-effort:
+    the flow should continue and reach the origin rather than being aborted.
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        addon.storage = FailingStorage()
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"fail-key")],
+            ),
+            resp=False,
+        )
+        addon.request(flow)  # must not raise
+        assert flow.response is None  # flow continues to origin
+
+
+def test_storage_exception_in_response_does_not_propagate() -> None:
+    """response() must not raise when the storage backend throws.
+
+    A write failure during caching is best-effort: the flow completes
+    normally even though the response is not cached.
+    """
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        addon.storage = FailingStorage()
+
+        flow = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"fail-key")],
+            ),
+            resp=tutils.tresp(content=b"Hello", status_code=200),
+        )
+        # Simulate that this response came from origin (cache_from_origin=True)
+        flow.metadata["Mitm-Cache-From-Origin"] = True
+        addon.response(flow)  # must not raise
 
 
 def test_sanitize_for_log() -> None:

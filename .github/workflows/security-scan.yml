@@ -24,6 +24,9 @@ jobs:
         # The mitmproxy 10.x advisories (GHSA-527g-3w9m-29hv, GHSA-63cx-g855-hvv4,
         # GHSA-wg33-5h85-7q5p, PYSEC-2026-92) cannot be resolved without dropping
         # Python < 3.12 support, as mitmproxy 12+ requires Python 3.12+.
+        # The tornado advisories (GHSA-cx3h-4qpv-8hc9, GHSA-mgf9-4vpg-hj56,
+        # GHSA-3x9g-8vmp-wqvf, GHSA-pw6j-qg29-8w7f) cannot be resolved because
+        # mitmproxy 12.2.3 pins tornado<=6.5.5; fixed versions require tornado>=6.5.6.
         run: |
           uv --preview audit --frozen \
             --ignore GHSA-2qfp-q593-8484 \
@@ -39,4 +42,10 @@ jobs:
             --ignore GHSA-wg33-5h85-7q5p \
             --ignore PYSEC-2026-92 \
             --ignore GHSA-5pwr-322w-8jr4 \
-            --ignore GHSA-vp96-hxj8-p424
+            --ignore GHSA-vp96-hxj8-p424 \
+            --ignore GHSA-537c-gmf6-5ccf \
+            --ignore GHSA-6v7p-g79w-8964 \
+            --ignore GHSA-cx3h-4qpv-8hc9 \
+            --ignore GHSA-mgf9-4vpg-hj56 \
+            --ignore GHSA-3x9g-8vmp-wqvf \
+            --ignore GHSA-pw6j-qg29-8w7f
