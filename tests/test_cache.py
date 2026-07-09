@@ -558,3 +558,27 @@ def test_sanitize_for_log() -> None:
     assert _sanitize_for_log("key\r\n") == "key\\x0d\\x0a"
     assert _sanitize_for_log("\x1b[31mred\x1b[0m") == "\\x1b[31mred\\x1b[0m"
     assert _sanitize_for_log("") == ""
+
+
+def test_storage_factory_invalid_max_entries_defaults_to_unlimited() -> None:
+    """StorageFactory.create() must not raise on non-integer cache_max_entries.
+
+    mitmproxy's typespec=int normally prevents this, but defensive coding
+    requires a try/except guard for edge cases such as typespec bypass or
+    future runtime changes.
+    """
+    from unittest.mock import MagicMock, patch
+
+    from mitmcache.storage.factory import StorageFactory
+
+    factory = StorageFactory()
+    mock_options = MagicMock()
+    mock_options.cache_max_entries = "not-an-int"
+    mock_options.cache_file = ":memory:"
+
+    with patch("mitmcache.storage.factory.ctx") as mock_ctx:
+        mock_ctx.options = mock_options
+        storage = factory.create()
+
+    assert storage is not None
+    storage.close()
