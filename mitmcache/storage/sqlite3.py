@@ -70,6 +70,7 @@ class SQLiteStorage:
             # Skip entries whose BLOB was written by a different mitmproxy
             # version; deserialization may silently fail or raise.
             if stored_version != _MITMPROXY_VERSION:
+                self._purge_with_cursor(cursor, cache_key)
                 return None
             cursor.execute(
                 "UPDATE cache SET last_accessed_at = ? WHERE cache_key = ?",
@@ -83,6 +84,7 @@ class SQLiteStorage:
                         None,
                     )
             except Exception:
+                self._purge_with_cursor(cursor, cache_key)
                 return None
 
         return None
@@ -194,6 +196,11 @@ class SQLiteStorage:
 
     def purge(self, cache_key: str) -> None:
         cursor = self.conn.cursor()
+        self._purge_with_cursor(cursor, cache_key)
+
+    def _purge_with_cursor(
+        self, cursor: sqlite3.Cursor, cache_key: str
+    ) -> None:
         cursor.execute("DELETE FROM cache WHERE cache_key=?", (cache_key,))
         self.conn.commit()
 
