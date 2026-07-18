@@ -112,7 +112,7 @@ class Cache:
 
         # Check if the response has a cache key
         cache_key = self.get_cache_key_from_flow(flow)
-        if flow.metadata.get(self.cache_from_origin, False) and cache_key:
+        if flow.metadata.get(self.cache_from_origin, False) and cache_key is not None:
             self._store_response(cache_key, flow)
 
     def _store_response(self, cache_key: str, flow: http.HTTPFlow) -> None:
