@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+from mitmproxy import exceptions
 from mitmproxy.addons import script
 from mitmproxy.test import taddons, tflow, tutils
 
@@ -295,6 +297,26 @@ def test_request_and_response_after_done_are_no_ops() -> None:
         # configure() reopens storage and clears the closed flag.
         addon.configure({"cache_file"})
         assert addon._closed is False
+
+
+def test_configure_rejects_overlapping_metadata_keys() -> None:
+    """cache_from_origin must not alias the public cache key option."""
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        original_storage = addon.storage
+
+        with pytest.raises(
+            exceptions.OptionsError,
+            match="cache_from_origin must differ from cache_key",
+        ):
+            with tctx.options.rollback({"cache_from_origin"}, reraise=True):
+                tctx.options.update(cache_from_origin=addon.cache_key)
+                addon.configure({"cache_from_origin"})
+
+        assert addon.storage is original_storage
+        assert addon.cache_from_origin != addon.cache_key
+        addon.done()
+
 
 def test_error_response_not_cached() -> None:
     """Error responses (4xx/5xx) must not be stored in the cache.
