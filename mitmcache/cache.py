@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 
-from mitmproxy import ctx, http
+from mitmproxy import ctx, exceptions, http
 from mitmproxy.addonmanager import Loader
 from mitmproxy.http import HTTPFlow
 
@@ -45,6 +45,11 @@ class Cache:
         self.storage_factory.load(loader)
 
     def configure(self, updated: set[str]) -> None:
+        if self.cache_key == self.cache_from_origin:
+            raise exceptions.OptionsError(
+                "cache_from_origin must differ from cache_key because it is "
+                "used as an internal flow.metadata key."
+            )
         existing = getattr(self, "storage", None)
         if (
             existing is not None
@@ -88,7 +93,9 @@ class Cache:
         cache_from_origin = True
 
         # Get response from cache
-        if cache_key is not None and self._set_cached_response(flow, cache_key):
+        if cache_key is not None and self._set_cached_response(
+            flow, cache_key
+        ):
             cache_from_origin = False
 
         # Set cache key to flow
@@ -181,9 +188,7 @@ class Cache:
                 return candidate
         return None
 
-    def cache_key_candidates(
-        self, flow: HTTPFlow
-    ) -> list[str | None]:
+    def cache_key_candidates(self, flow: HTTPFlow) -> list[str | None]:
         candidates: list[str | None] = [
             flow.metadata.get(self.cache_key),
             flow.request.headers.get(self.cache_key),
