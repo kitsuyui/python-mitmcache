@@ -156,8 +156,8 @@ def test_cache_storage_records_flow_format_version() -> None:
     storage.close()
 
 
-def test_cache_storage_version_mismatch_returns_none() -> None:
-    """Confirm that a version-mismatched entry is treated as a cache miss."""
+def test_cache_storage_version_mismatch_purges_unreadable_row() -> None:
+    """Version-mismatched entries should be removed after a failed read."""
     storage = SQLiteStorage(":memory:")
     flow = example_flow()
     storage.store("test", flow)
@@ -170,11 +170,16 @@ def test_cache_storage_version_mismatch_returns_none() -> None:
     storage.conn.commit()
 
     assert storage.get("test") is None
+    row = storage.conn.execute(
+        "SELECT 1 FROM cache WHERE cache_key=?",
+        ("test",),
+    ).fetchone()
+    assert row is None
     storage.close()
 
 
-def test_cache_storage_corrupt_blob_returns_none() -> None:
-    """Confirm that a corrupt BLOB does not crash get() and returns None."""
+def test_cache_storage_corrupt_blob_purges_unreadable_row() -> None:
+    """Corrupt BLOB rows should be removed after a failed read."""
     storage = SQLiteStorage(":memory:")
     flow = example_flow()
     storage.store("test", flow)
@@ -186,6 +191,11 @@ def test_cache_storage_corrupt_blob_returns_none() -> None:
     storage.conn.commit()
 
     assert storage.get("test") is None
+    row = storage.conn.execute(
+        "SELECT 1 FROM cache WHERE cache_key=?",
+        ("test",),
+    ).fetchone()
+    assert row is None
     storage.close()
 
 
