@@ -150,6 +150,53 @@ def test_cache_hit() -> None:
         addon.done()
 
 
+def test_empty_cache_key_is_stored_and_hit() -> None:
+    """Empty cache key values should participate in request/response transitions."""
+    with taddons.context() as tctx:
+        addon = tctx.script("inject.py").addons[0]
+        storage = TrackingStorage(addon.storage)
+        addon.storage = storage
+
+        flow_store = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"")],
+            ),
+            resp=tutils.tresp(
+                content=b"Hello, World!",
+                status_code=200,
+            ),
+        )
+        addon.request(flow_store)
+        addon.response(flow_store)
+        assert storage.upsert_count == 1
+        assert storage.store_count == 0
+        assert storage.update_count == 0
+
+        flow_hit = tflow.tflow(
+            req=tutils.treq(
+                method=b"GET",
+                path=b"/",
+                host=b"localhost:65535",
+                headers=[(b"Mitm-Cache-Key", b"")],
+            ),
+            resp=False,
+        )
+        addon.request(flow_hit)
+        assert flow_hit.response is not None
+        assert flow_hit.response.text == "Hello, World!"
+        assert flow_hit.metadata[addon.cache_from_origin] is False
+        addon.response(flow_hit)
+
+        assert storage.upsert_count == 1
+        assert storage.store_count == 0
+        assert storage.update_count == 0
+
+        addon.done()
+
+
 def test_cache_entry_without_response_is_ignored() -> None:
     """Confirm that an incomplete cached flow does not short-circuit."""
     with taddons.context() as tctx:
