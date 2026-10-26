@@ -1,0 +1,70 @@
+name: Source release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version tag (vMAJOR.MINOR.PATCH)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "${{ matrix.python }}"
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - name: Install dependencies
+        run: |
+          uv python pin "${{ matrix.python }}"
+          uv sync --locked
+          actual="$(uv run python --version)"
+          [[ "$actual" == "Python ${{ matrix.python }}."* ]]
+      - name: Lint
+        run: uv run poe check
+      - name: Type check
+        run: uv run poe typecheck
+      - name: Test
+        run: uv run poe test
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Validate release tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must be vMAJOR.MINOR.PATCH" >&2
+            exit 1
+          fi
+      - name: Create tag at the tested commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          # Creating the ref is atomic: an existing tag fails rather than being reused.
+          gh api --method POST "repos/${GH_REPO}/git/refs" \
+            -f "ref=refs/tags/${VERSION}" -f "sha=${GITHUB_SHA}"
+          actual="$(gh api "repos/${GH_REPO}/git/ref/tags/${VERSION}" --jq .object.sha)"
+          [[ "$actual" == "$GITHUB_SHA" ]] || { echo "Tag does not point to tested commit" >&2; exit 1; }
+      - name: Create source release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+        run: gh release create "$VERSION" --verify-tag --title "$VERSION" --generate-notes
