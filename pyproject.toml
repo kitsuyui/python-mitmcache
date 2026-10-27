@@ -28,6 +28,7 @@ dev-dependencies = [
     "pytest",
     "pytest-cov",
     "poethepoet",
+    "setuptools>=84.1.0",
     "setuptools-scm",
     "ruff",
     "mypy",
