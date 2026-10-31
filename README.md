@@ -74,6 +74,17 @@ $ mitmdump -s inject.py --set cache_file=cache.db
 `uv run poe proxy` already passes `--set cache_file=cache.db` so it
 creates a `cache.db` file in the current directory automatically.
 
+## Source releases
+
+This project is distributed from its source repository, not PyPI. To create a
+versioned source release, run the **Source release** workflow on `main` and
+provide a new `vMAJOR.MINOR.PATCH` tag. The workflow runs lint, type checking,
+and tests on Python 3.12, 3.13, and 3.14 before creating a GitHub Release
+for the tested commit. Review the generated notes after the workflow finishes.
+The workflow does not publish a Python package. Existing tags are rejected. If
+release creation fails after the tag is created, inspect the tag and create the
+matching GitHub Release manually; do not move the tag.
+
 ## Development
 
 This repository uses [lefthook](https://lefthook.dev/) to run the same checks as CI
