@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "uv"
+    directory: "/"
+    allow:
+      - dependency-type: "direct"
+      - dependency-name: "setuptools"
+        dependency-type: "indirect"
+    schedule:
+      interval: "weekly"
