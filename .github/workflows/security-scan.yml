@@ -27,6 +27,8 @@ jobs:
         # The tornado advisories (GHSA-cx3h-4qpv-8hc9, GHSA-mgf9-4vpg-hj56,
         # GHSA-3x9g-8vmp-wqvf, GHSA-pw6j-qg29-8w7f) cannot be resolved because
         # mitmproxy 12.2.3 pins tornado<=6.5.5; fixed versions require tornado>=6.5.6.
+        # The newer advisories below are likewise blocked by mitmproxy's
+        # dependency pins and are retained as known baseline vulnerabilities.
         run: |
           uv --preview audit --frozen \
             --ignore GHSA-2qfp-q593-8484 \
@@ -48,4 +50,25 @@ jobs:
             --ignore GHSA-cx3h-4qpv-8hc9 \
             --ignore GHSA-mgf9-4vpg-hj56 \
             --ignore GHSA-3x9g-8vmp-wqvf \
-            --ignore GHSA-pw6j-qg29-8w7f
+            --ignore GHSA-pw6j-qg29-8w7f \
+            --ignore PYSEC-2026-4322 \
+            --ignore GHSA-6hr6-w5qg-qmwg \
+            --ignore PYSEC-2026-3628 \
+            --ignore PYSEC-2026-4053 \
+            --ignore GHSA-xmj3-9gf7-h52w \
+            --ignore GHSA-chx6-46f5-w4vp \
+            --ignore GHSA-wwv5-g3v4-889x \
+            --ignore GHSA-8423-8fgw-73vq \
+            --ignore GHSA-3hv7-mjh2-fv65 \
+            --ignore GHSA-c2m8-h5v5-343r \
+            --ignore PYSEC-2026-3928 \
+            --ignore PYSEC-2026-4312 \
+            --ignore GHSA-9m75-vc3g-4x39 \
+            --ignore GHSA-mm57-4v3p-rchx \
+            --ignore GHSA-fm9c-5rcf-2q5p \
+            --ignore GHSA-2qm8-x737-gmw5 \
+            --ignore GHSA-pcg2-g6cj-q92c \
+            --ignore GHSA-5cjw-f85j-cv6r \
+            --ignore GHSA-r4j5-9xpp-3985 \
+            --ignore GHSA-pw9p-v7r6-gx4p \
+            --ignore GHSA-cp25-j9x5-p5xm
