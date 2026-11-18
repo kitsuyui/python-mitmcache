@@ -24,6 +24,7 @@ Homepage = "https://github.com/kitsuyui/python-mitmcache"
 # https://github.com/kitsuyui/kitsuyui/wiki/Official-Information-for-Dependency-Update-Policies
 # PyPI policy in this repo uses a 2 day quarantine window.
 exclude-newer = "2 days"
+override-dependencies = ["tornado==6.6.1"]
 dev-dependencies = [
     "pytest",
     "pytest-cov",
